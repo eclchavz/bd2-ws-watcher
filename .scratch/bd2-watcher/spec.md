@@ -96,5 +96,5 @@ A small app that runs in one Docker container on my PC, and can later move uncha
 
 - **Facts still to verify (first tickets):** which platform Lumius and Hammer Girl Anime run on; the official JP and EN sites' page structure and whether they have RSS feeds; the Brown Dust 2 set code; whether each store's robots.txt allows `products.json`. None of these could be reached from the planning environment.
 - **Sources used during planning:** [Bushiroad press release](https://www.gamedeveloper.com/press-release/trial-deck-booster-pack-browndust2-from-wei-schwarz-releases-friday-july-3-), [TCG Corner listing](https://tcg-corner.com/products/weiss-schwarz-brown-dust-2-booster-japanese-pre-order), [Japan-Figure listing](https://japan-figure.com/products/bushiroad-weiss-schwarz-brown-dust-2-tcg-booster-box-cards), [Google Cloud free tier](https://cloud.google.com/free/docs/compute-getting-started).
-- The user's time zone isn't recorded yet. Set `TZ` in `.env` during setup.
+- Time zone: `TZ=America/Phoenix` (Arizona, no daylight saving).
 - Decisions behind the design are in `docs/adr/0001-single-container-sqlite.md` and `docs/adr/0002-alert-on-transitions.md`.
