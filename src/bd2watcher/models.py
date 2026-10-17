@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -30,3 +31,11 @@ class Listing:
     price: Decimal | None
     currency: str
     stock_state: StockState
+
+
+@dataclass(frozen=True)
+class Check:
+    checked_at: datetime
+    ok: bool
+    listing_count: int
+    error: str | None

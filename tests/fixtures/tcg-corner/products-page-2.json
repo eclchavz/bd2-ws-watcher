@@ -7,8 +7,33 @@
       "product_type": "",
       "tags": [],
       "variants": [
-        {"id": 5007, "title": "1 BOX", "price": "56.00", "available": false},
-        {"id": 5008, "title": "2 BOX", "price": "110.00", "available": true}
+        {
+          "id": 5007,
+          "title": "1 BOX",
+          "price": "56.00",
+          "available": false
+        },
+        {
+          "id": 5008,
+          "title": "2 BOX",
+          "price": "110.00",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": 1008,
+      "title": "Brown Dust 2 bd2/w128-p02 Liatris (PR) Box Topper",
+      "handle": "bd2-w128-p02-liatris-pr",
+      "product_type": "",
+      "tags": [],
+      "variants": [
+        {
+          "id": 5009,
+          "title": "Default Title",
+          "price": "30.00",
+          "available": true
+        }
       ]
     }
   ]

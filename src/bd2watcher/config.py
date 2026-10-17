@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel
@@ -27,7 +28,7 @@ class KindRules(BaseModel):
 
 class Source(BaseModel):
     name: str
-    adapter: str
+    adapter: Literal["shopify"]
     base_url: str
     products_path: str = "/products.json"
     currency: str

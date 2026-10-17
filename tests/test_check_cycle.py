@@ -60,3 +60,35 @@ def test_a_second_check_updates_listings_instead_of_duplicating(config, store, n
     run_check(config.source("tcg-corner"), config, tcg_corner_fetcher, store, now)
 
     assert len(store.listings("tcg-corner")) == 5
+
+
+def test_lowercase_card_codes_are_still_single_cards(config, store, now, tcg_corner_fetcher):
+    run_check(config.source("tcg-corner"), config, tcg_corner_fetcher, store, now)
+
+    assert "Brown Dust 2 bd2/w128-p02 Liatris (PR) Box Topper" not in by_title(store.listings("tcg-corner"))
+
+
+def test_a_store_that_ignores_paging_does_not_loop_forever(config, store, now):
+    from conftest import FIXTURES, FakeFetcher
+
+    class SamePageForever(FakeFetcher):
+        def get_json(self, url):
+            self.requested.append(url)
+            return FakeFetcher.get_json(self.inner, "page-1")
+
+    fetcher = SamePageForever({})
+    fetcher.inner = FakeFetcher({"page-1": FIXTURES / "tcg-corner" / "products-page-1.json"})
+    run_check(config.source("tcg-corner"), config, fetcher, store, now)
+
+    assert len(fetcher.requested) == 2
+    assert len(store.listings("tcg-corner")) == 4
+
+
+def test_a_failed_check_is_recorded_and_still_raised(config, store, now):
+    import pytest
+    from conftest import FakeFetcher
+
+    with pytest.raises(KeyError):
+        run_check(config.source("tcg-corner"), config, FakeFetcher({}), store, now)
+
+    assert store.last_check("tcg-corner").ok is False

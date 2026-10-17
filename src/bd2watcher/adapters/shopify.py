@@ -4,19 +4,25 @@ from bd2watcher.config import Source
 from bd2watcher.models import RawListing
 
 PAGE_SIZE = 250
+MAX_PAGES = 40
 
 
 def fetch(source: Source, fetcher) -> list[RawListing]:
-    """Read every page of a Shopify store's products.json until an empty page comes back."""
+    """Read every page of a Shopify store's products.json until an empty page comes back.
+
+    Stops early if a page repeats products already seen, which happens when a store ignores `page`.
+    """
     listings: list[RawListing] = []
-    page = 1
-    while True:
+    seen_ids: set[str] = set()
+    for page in range(1, MAX_PAGES + 1):
         url = f"{source.base_url}{source.products_path}?limit={PAGE_SIZE}&page={page}"
         products = fetcher.get_json(url).get("products", [])
-        if not products:
-            return listings
-        listings.extend(_to_raw(source, p) for p in products)
-        page += 1
+        new = [p for p in products if str(p["id"]) not in seen_ids]
+        if not new:
+            break
+        seen_ids.update(str(p["id"]) for p in new)
+        listings.extend(_to_raw(source, p) for p in new)
+    return listings
 
 
 def _to_raw(source: Source, product: dict) -> RawListing:

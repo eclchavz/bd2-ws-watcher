@@ -24,7 +24,7 @@ def kind_of(raw: RawListing, config: Config) -> Kind | None:
     title = unicodedata.normalize("NFKC", raw.title)
     if raw.product_type in rules.single.product_types:
         return None
-    if any(re.search(p, title) for p in rules.single.patterns):
+    if any(re.search(p, title, re.IGNORECASE) for p in rules.single.patterns):
         return None
     folded = normalise(raw.title)
     if any(normalise(k) in folded for k in rules.supply):

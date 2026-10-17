@@ -14,8 +14,10 @@ def find_watched(source: Source, config: Config, fetcher) -> list[Listing]:
     found = []
     for raw in ADAPTERS[source.adapter](source, fetcher):
         series = series_of(raw, config)
+        if series is None:
+            continue
         kind = kind_of(raw, config)
-        if series is None or kind not in ("sealed", "supply"):
+        if kind not in ("sealed", "supply"):
             continue
         found.append(
             Listing(
@@ -28,8 +30,12 @@ def find_watched(source: Source, config: Config, fetcher) -> list[Listing]:
 
 
 def run_check(source: Source, config: Config, fetcher, store: Store, now: datetime) -> list[Listing]:
-    """One check of one source: fetch, classify, save."""
-    listings = find_watched(source, config, fetcher)
+    """One check of one source: fetch, classify, save. A failure is recorded, then re-raised."""
+    try:
+        listings = find_watched(source, config, fetcher)
+    except Exception as e:
+        store.record_check(source.name, now, ok=False, listing_count=0, error=f"{type(e).__name__}: {e}")
+        raise
     store.save_listings(listings, now)
     store.record_check(source.name, now, ok=True, listing_count=len(listings))
     return listings

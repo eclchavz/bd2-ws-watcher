@@ -35,3 +35,47 @@ def test_robots_txt_is_read_once_per_host():
     fetcher.get_json("https://store.example/a.json")
     fetcher.get_json("https://store.example/b.json")
     assert [r.url.path for r in seen] == ["/robots.txt", "/a.json", "/b.json"]
+
+
+def fetcher_with(routes, seen):
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return routes[str(request.url)]()
+
+    return HttpFetcher("bd2-ws-watcher/test", transport=httpx.MockTransport(handler))
+
+
+def test_robots_txt_server_error_means_disallow_everything():
+    seen = []
+    fetcher = fetcher_with({"https://store.example/robots.txt": lambda: httpx.Response(503)}, seen)
+    with pytest.raises(RobotsDisallowed):
+        fetcher.get_json("https://store.example/products.json")
+    assert seen == ["https://store.example/robots.txt"]
+
+
+def test_redirect_targets_are_checked_against_their_own_robots_txt():
+    seen = []
+    fetcher = fetcher_with(
+        {
+            "https://store.example/robots.txt": lambda: httpx.Response(404),
+            "https://store.example/products.json": lambda: httpx.Response(
+                301, headers={"location": "https://cdn.example/products.json"}
+            ),
+            "https://cdn.example/robots.txt": lambda: httpx.Response(200, text="User-agent: *\nDisallow: /\n"),
+        },
+        seen,
+    )
+    with pytest.raises(RobotsDisallowed):
+        fetcher.get_json("https://store.example/products.json")
+    assert "https://cdn.example/products.json" not in seen
+
+
+def test_robots_txt_is_read_again_after_a_day():
+    seen = []
+    clock = [0.0]
+    fetcher = make_fetcher(seen)
+    fetcher.clock = lambda: clock[0]
+    fetcher.get_json("https://store.example/a.json")
+    clock[0] += 24 * 3600 + 1
+    fetcher.get_json("https://store.example/b.json")
+    assert [r.url.path for r in seen] == ["/robots.txt", "/a.json", "/robots.txt", "/b.json"]

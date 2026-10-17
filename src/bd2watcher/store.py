@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 from decimal import Decimal
 
-from bd2watcher.models import Listing
+from bd2watcher.models import Check, Listing
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS source_checks (
@@ -69,6 +69,17 @@ class Store:
                 " VALUES (?, ?, ?, ?, ?)",
                 (source, checked_at.isoformat(), int(ok), listing_count, error),
             )
+
+    def last_check(self, source: str) -> "Check | None":
+        row = self.db.execute(
+            "SELECT checked_at, ok, listing_count, error FROM source_checks"
+            " WHERE source = ? ORDER BY id DESC LIMIT 1",
+            (source,),
+        ).fetchone()
+        if row is None:
+            return None
+        return Check(checked_at=datetime.fromisoformat(row[0]), ok=bool(row[1]),
+                     listing_count=row[2], error=row[3])
 
     def listings(self, source: str) -> list[Listing]:
         rows = self.db.execute(
