@@ -1,0 +1,15 @@
+{
+  "products": [
+    {
+      "id": 1007,
+      "title": "ヴァイスシュヴァルツ ブースターパック ＢｒｏｗｎＤｕｓｔ２ ＢＯＸ",
+      "handle": "ws-browndust2-booster-box-jp",
+      "product_type": "",
+      "tags": [],
+      "variants": [
+        {"id": 5007, "title": "1 BOX", "price": "56.00", "available": false},
+        {"id": 5008, "title": "2 BOX", "price": "110.00", "available": true}
+      ]
+    }
+  ]
+}
