@@ -46,3 +46,43 @@ def tcg_corner_fetcher():
     return FakeFetcher(
         {f"{base}{n}": FIXTURES / "tcg-corner" / f"products-page-{n}.json" for n in (1, 2, 3)}
     )
+
+
+class RecordingNotifier:
+    """Stands in for Discord: keeps every alert it was asked to send."""
+
+    channel = "discord"
+
+    def __init__(self):
+        self.sent = []
+
+    def send(self, alert) -> None:
+        self.sent.append(alert)
+
+
+class ShopifyStoreFake:
+    """A fake Shopify store whose products a test can change between checks."""
+
+    def __init__(self, base_url: str, products: list[dict]):
+        self.base_url = base_url
+        self.products = products
+        self.requested: list[str] = []
+
+    def get_json(self, url: str):
+        self.requested.append(url)
+        page = int(url.rsplit("page=", 1)[1])
+        return {"products": self.products if page == 1 else []}
+
+    def product(self, product_id: int) -> dict:
+        return next(p for p in self.products if p["id"] == product_id)
+
+
+@pytest.fixture
+def notifier():
+    return RecordingNotifier()
+
+
+@pytest.fixture
+def tcg_corner():
+    products = json.loads((FIXTURES / "tcg-corner" / "products-page-1.json").read_text(encoding="utf-8"))
+    return ShopifyStoreFake("https://tcg-corner.com", products["products"])
