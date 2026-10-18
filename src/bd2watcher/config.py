@@ -33,15 +33,15 @@ class Alerts(BaseModel):
 
 class Source(BaseModel):
     name: str
-    label: str = ""
+    label: str | None = None
     adapter: Literal["shopify"]
     base_url: str
     products_path: str = "/products.json"
     currency: str
 
-    def model_post_init(self, _context) -> None:
-        if not self.label:
-            self.label = self.name
+    @property
+    def display_name(self) -> str:
+        return self.label or self.name
 
 
 class Config(BaseModel):

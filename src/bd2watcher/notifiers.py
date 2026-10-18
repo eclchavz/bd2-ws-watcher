@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 
 HEADLINES = {
     "new_listing": "🆕 NEW",
-    "restock": "🟢 RESTOCK",
+    "restock": "🟢 IN STOCK",
     "preorder_opened": "📦 PREORDER OPEN",
 }
 STOCK_WORDS = {"in_stock": "in stock", "preorder": "preorder", "sold_out": "sold out", "unknown": "stock unknown"}

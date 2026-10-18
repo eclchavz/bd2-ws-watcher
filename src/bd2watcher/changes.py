@@ -12,6 +12,6 @@ def detect(previous: dict[str, Listing], current: list[Listing], at: datetime) -
             events.append(Event("new_listing", listing, at))
         elif listing.stock_state == "preorder" and before.stock_state != "preorder":
             events.append(Event("preorder_opened", listing, at))
-        elif listing.stock_state == "in_stock" and before.stock_state in ("sold_out", "unknown"):
+        elif listing.stock_state == "in_stock" and before.stock_state in ("sold_out", "preorder"):
             events.append(Event("restock", listing, at))
     return events

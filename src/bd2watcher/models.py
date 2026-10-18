@@ -58,3 +58,4 @@ class Alert:
     listing: Listing
     store_label: str
     sent_at: datetime
+    ok: bool = True

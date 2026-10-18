@@ -51,7 +51,7 @@ def tcg_corner_fetcher():
 class RecordingNotifier:
     """Stands in for Discord: keeps every alert it was asked to send."""
 
-    channel = "discord"
+    channel = label = "discord"
 
     def __init__(self):
         self.sent = []

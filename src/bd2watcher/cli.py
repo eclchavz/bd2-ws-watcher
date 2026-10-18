@@ -31,8 +31,7 @@ def build_notifiers(config: Config, dry_run: bool) -> list:
     if dry_run or config.alerts.dry_run:
         return [DryRunNotifier("discord")]
     if not webhook:
-        log.warning("DISCORD_WEBHOOK_URL is not set, so Discord alerts are logged instead of sent")
-        return [DryRunNotifier("discord")]
+        raise SystemExit("DISCORD_WEBHOOK_URL is not set in .env. Set it, or use --dry-run.")
     return [DiscordNotifier(webhook)]
 
 
@@ -78,9 +77,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="bd2watcher")
     parser.add_argument("--config", default=os.environ.get("BD2_CONFIG", "config/config.yaml"))
     commands = parser.add_subparsers(dest="command", required=True)
-    parser.add_argument("--dry-run", action="store_true", help="log alerts instead of sending them")
-    commands.add_parser("run", help="check on a schedule until stopped")
-    test_parser = commands.add_parser("send-test-alert", help="send a sample alert to one channel")
+    dry_run = argparse.ArgumentParser(add_help=False)
+    dry_run.add_argument("--dry-run", action="store_true", help="log alerts instead of sending them")
+    commands.add_parser("run", parents=[dry_run], help="check on a schedule until stopped")
+    test_parser = commands.add_parser("send-test-alert", parents=[dry_run], help="send a sample alert to one channel")
     test_parser.add_argument("channel", choices=["discord"])
     check_parser = commands.add_parser("check-now", help="check live and print, without saving")
     check_parser.add_argument("sources", nargs="*", help="source names (default: all)")

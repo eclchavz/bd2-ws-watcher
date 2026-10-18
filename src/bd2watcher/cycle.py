@@ -5,16 +5,24 @@ from bd2watcher.alerts import deliver
 from bd2watcher.changes import detect
 from bd2watcher.classify import kind_of, series_of, stock_state_of
 from bd2watcher.config import Config, Source
-from bd2watcher.models import Listing
+from bd2watcher.models import Listing, RawListing
 from bd2watcher.store import Store
 
 ADAPTERS = {"shopify": shopify.fetch}
 
 
+class EmptyResult(Exception):
+    """A source that used to have products returned none, which means it's broken, not sold out."""
+
+
 def find_watched(source: Source, config: Config, fetcher) -> list[Listing]:
     """Fetch a source and keep only watched sealed and supply listings. Writes nothing."""
+    return watched(source, config, ADAPTERS[source.adapter](source, fetcher))
+
+
+def watched(source: Source, config: Config, raws: list[RawListing]) -> list[Listing]:
     found = []
-    for raw in ADAPTERS[source.adapter](source, fetcher):
+    for raw in raws:
         series = series_of(raw, config)
         if series is None:
             continue
@@ -38,7 +46,10 @@ def run_check(source: Source, config: Config, fetcher, store: Store, now: dateti
     The first successful check of a source is a silent baseline. A failure is recorded, then re-raised.
     """
     try:
-        listings = find_watched(source, config, fetcher)
+        raws = ADAPTERS[source.adapter](source, fetcher)
+        if not raws and store.has_successful_check(source.name):
+            raise EmptyResult(f"{source.name} returned no products at all")
+        listings = watched(source, config, raws)
     except Exception as e:
         store.record_check(source.name, now, ok=False, listing_count=0, error=f"{type(e).__name__}: {e}")
         raise
