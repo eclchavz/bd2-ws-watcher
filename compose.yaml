@@ -1,0 +1,9 @@
+services:
+  bd2watcher:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    mem_limit: 700m

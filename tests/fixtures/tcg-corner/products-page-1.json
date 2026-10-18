@@ -1,0 +1,52 @@
+{
+  "products": [
+    {
+      "id": 1001,
+      "title": "Weiss Schwarz Brown Dust 2 Booster Box (Japanese)",
+      "handle": "weiss-schwarz-brown-dust-2-booster-box-japanese",
+      "product_type": "Booster Box",
+      "tags": ["Japanese", "Weiss Schwarz"],
+      "variants": [{"id": 5001, "title": "Default Title", "price": "54.99", "available": true}]
+    },
+    {
+      "id": 1002,
+      "title": "Weiss Schwarz Brown Dust 2 Booster Case [x12] (Japanese)",
+      "handle": "weiss-schwarz-brown-dust-2-booster-case-japanese",
+      "product_type": "Booster Case",
+      "tags": ["Japanese", "Pre-Order", "Weiss Schwarz"],
+      "variants": [{"id": 5002, "title": "Default Title", "price": "340.00", "available": true}]
+    },
+    {
+      "id": 1003,
+      "title": "Weiss Schwarz BrownDust2 Trial Deck (Japanese)",
+      "handle": "weiss-schwarz-browndust2-trial-deck-japanese",
+      "product_type": "Trial Deck",
+      "tags": ["Japanese", "Weiss Schwarz"],
+      "variants": [{"id": 5003, "title": "Default Title", "price": "14.99", "available": false}]
+    },
+    {
+      "id": 1004,
+      "title": "Bushiroad Sleeve Collection High-grade Brown Dust 2 Justia",
+      "handle": "bushiroad-sleeve-collection-hg-brown-dust-2-justia",
+      "product_type": "Sleeves",
+      "tags": ["Supplies"],
+      "variants": [{"id": 5004, "title": "Default Title", "price": "9.99", "available": true}]
+    },
+    {
+      "id": 1005,
+      "title": "Brown Dust 2 BD2/W128-P01 Justia (PR) Booster Box Promo",
+      "handle": "bd2-w128-001sp-justia-sp",
+      "product_type": "",
+      "tags": ["Japanese", "Singles"],
+      "variants": [{"id": 5005, "title": "Near Mint", "price": "120.00", "available": true}]
+    },
+    {
+      "id": 1006,
+      "title": "Weiss Schwarz Re:Zero Vol.4 Booster Box (Japanese)",
+      "handle": "weiss-schwarz-re-zero-vol-4-booster-box-japanese",
+      "product_type": "Booster Box",
+      "tags": ["Japanese", "Weiss Schwarz"],
+      "variants": [{"id": 5006, "title": "Default Title", "price": "52.99", "available": true}]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+from pathlib import Path
+from typing import Literal
+
+import yaml
+from pydantic import BaseModel
+
+
+class Intervals(BaseModel):
+    store_minutes: int = 10
+    official_minutes: int = 60
+
+
+class Watchlist(BaseModel):
+    series: str
+    keywords: list[str]
+
+
+class SingleRules(BaseModel):
+    patterns: list[str] = []
+    product_types: list[str] = []
+
+
+class KindRules(BaseModel):
+    single: SingleRules = SingleRules()
+    supply: list[str] = []
+    sealed: list[str] = []
+
+
+class Source(BaseModel):
+    name: str
+    adapter: Literal["shopify"]
+    base_url: str
+    products_path: str = "/products.json"
+    currency: str
+
+
+class Config(BaseModel):
+    intervals: Intervals = Intervals()
+    user_agent: str
+    watchlists: list[Watchlist]
+    kinds: KindRules
+    preorder_markers: list[str] = []
+    sources: list[Source]
+
+    def source(self, name: str) -> Source:
+        for source in self.sources:
+            if source.name == name:
+                return source
+        raise KeyError(f"No source named {name!r} in config")
+
+
+def load_config(path: Path | str) -> Config:
+    with open(path, encoding="utf-8") as f:
+        return Config.model_validate(yaml.safe_load(f))

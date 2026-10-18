@@ -1,0 +1,1 @@
+Hand-made in Shopify `products.json` format, because the store couldn't be reached from the planning environment. Ticket 04 replaces these files with a real capture (`bd2watcher capture-fixture tcg-corner`).

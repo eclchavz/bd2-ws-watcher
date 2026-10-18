@@ -16,3 +16,4 @@
 - [ ] Dry-run mode (config or flag) records alerts as sent to `dry-run` and makes no network calls
 - [ ] Alerts go to Discord at any hour (no quiet hours)
 - [ ] The Discord webhook URL comes only from `.env`
+- [ ] A listing missing from a successful check (delisted, or no longer matching) is marked `sold_out`, not left at its old stock state. It alerts again if it reappears. (From the ticket 01 code review.)
