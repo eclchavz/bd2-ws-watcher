@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from decimal import Decimal
 
 from bd2watcher.config import Source
@@ -7,22 +8,29 @@ PAGE_SIZE = 250
 MAX_PAGES = 40
 
 
-def fetch(source: Source, fetcher) -> list[RawListing]:
-    """Read every page of a Shopify store's products.json until an empty page comes back.
+def pages(source: Source, fetcher, max_pages: int = MAX_PAGES) -> Iterator[tuple[int, dict]]:
+    """Yield (page number, products.json body) until a page with no new products, which is yielded too.
 
-    Stops early if a page repeats products already seen, which happens when a store ignores `page`.
+    Stops early if a page only repeats products already seen, which happens when a store ignores `page`.
     """
-    listings: list[RawListing] = []
     seen_ids: set[str] = set()
-    for page in range(1, MAX_PAGES + 1):
+    for page in range(1, max_pages + 1):
         url = f"{source.base_url}{source.products_path}?limit={PAGE_SIZE}&page={page}"
-        products = fetcher.get_json(url).get("products", [])
-        new = [p for p in products if str(p["id"]) not in seen_ids]
-        if not new:
-            break
-        seen_ids.update(str(p["id"]) for p in new)
-        listings.extend(_to_raw(source, p) for p in new)
-    return listings
+        body = fetcher.get_json(url)
+        yield page, body
+        new_ids = {str(p["id"]) for p in body.get("products", [])} - seen_ids
+        if not new_ids:
+            return
+        seen_ids |= new_ids
+
+
+def fetch(source: Source, fetcher) -> list[RawListing]:
+    """Read every page of a Shopify store's products.json."""
+    listings: dict[str, RawListing] = {}
+    for _, body in pages(source, fetcher):
+        for product in body.get("products", []):
+            listings.setdefault(str(product["id"]), _to_raw(source, product))
+    return list(listings.values())
 
 
 def _to_raw(source: Source, product: dict) -> RawListing:

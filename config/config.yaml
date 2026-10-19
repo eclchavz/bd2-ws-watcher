@@ -39,11 +39,51 @@ english_markers: ["english", "en"]
 
 preorder_markers: ["pre-order", "preorder", "予約"]
 
+# Stores are checked every intervals.store_minutes. A disabled store is skipped until
+# `bd2watcher discover` confirms its platform, currency and best products_path.
+# Prefer a Weiss Schwarz collection path over /products.json: it's far fewer requests.
 sources:
-  # Platform and currency to be confirmed live in ticket 04.
   - name: tcg-corner
     label: TCG Corner
     adapter: shopify
     base_url: https://tcg-corner.com
     products_path: /products.json
-    currency: USD
+    currency: USD          # unconfirmed: run discover
+
+  - name: japan-figure
+    label: Japan-Figure
+    adapter: shopify
+    base_url: https://japan-figure.com
+    products_path: /products.json
+    currency: USD          # unconfirmed: run discover
+    enabled: false         # whole catalog is mostly figures: set a collection path first
+
+  - name: flipside-gaming
+    label: Flipside Gaming
+    adapter: shopify
+    base_url: https://flipsidegaming.com
+    products_path: /products.json
+    currency: USD          # unconfirmed: run discover
+    enabled: false
+
+  - name: jump-ichiban
+    label: Jump Ichiban
+    adapter: shopify
+    base_url: https://jumpichiban.com
+    products_path: /collections/weiss-schwarz-card-game-1/products.json  # seen in search results
+    currency: USD          # unconfirmed: run discover
+    enabled: false
+
+  - name: lumius
+    label: Lumius
+    adapter: shopify       # platform unknown: run discover
+    base_url: https://lumiusinc.com
+    currency: USD          # unconfirmed: run discover
+    enabled: false
+
+  - name: hammer-girl
+    label: Hammer Girl Anime
+    adapter: shopify       # platform unknown: run discover
+    base_url: https://www.hammergirlanime.com
+    currency: USD          # unconfirmed: run discover
+    enabled: false

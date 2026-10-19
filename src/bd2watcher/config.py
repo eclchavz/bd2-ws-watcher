@@ -43,6 +43,7 @@ class Source(BaseModel):
     base_url: str
     products_path: str = "/products.json"
     currency: str
+    enabled: bool = True
 
     @property
     def display_name(self) -> str:
@@ -59,6 +60,10 @@ class Config(BaseModel):
     products: list[ProductRule] = []
     english_markers: list[str] = []
     sources: list[Source]
+
+    @property
+    def enabled_sources(self) -> list[Source]:
+        return [s for s in self.sources if s.enabled]
 
     def source(self, name: str) -> Source:
         for source in self.sources:
