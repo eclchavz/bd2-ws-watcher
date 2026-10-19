@@ -144,3 +144,62 @@ def test_capture_fixture_saves_the_official_list_page(config, jp_site, tmp_path)
 
     capture_fixture(config, jp_site, "official-jp", tmp_path)
     assert (tmp_path / "official-jp" / "products.html").read_text(encoding="utf-8") == jp_site.html
+
+
+def test_a_set_without_its_own_date_does_not_borrow_a_neighbours(config, store, now, en_site, notifier):
+    en_site.add('<article><a href="/products/osk_bp_en/"><h3>Booster Pack Oshi no Ko</h3></a></article>')
+    check(config, "official-en", en_site, store, now, notifier)
+
+    assert {s.set_id: s.release_date for s in store.sets()}["osk_bp_en"] is None
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("Summer Season 2, 2026 Release: Oct 30, 2026", date(2026, 10, 30)),
+    ("Decks 2 2026, on sale September 4, 2026", date(2026, 9, 4)),
+    ("発売日：2026年7月3日（金）", date(2026, 7, 3)),
+])
+def test_release_dates_skip_lookalikes(text, expected):
+    from bd2watcher.official import parse_date
+    assert parse_date(text) == expected
+
+
+def test_links_on_the_www_host_still_count(config, store, now, notifier):
+    site = Site("https://ws-tcg.com", JP)
+    site.html = site.html.replace('href="/products/', 'href="https://www.ws-tcg.com/products/')
+    check(config, "official-jp", site, store, now, notifier)
+    assert {s.set_id for s in store.sets()} == {"brd_bp", "brd_td", "rz_bp4"}
+
+
+def test_an_empty_first_check_is_a_failure_not_a_baseline(config, store, now, jp_site, notifier):
+    jp_site.html = "<html><body>maintenance</body></html>"
+    with pytest.raises(Exception):
+        check(config, "official-jp", jp_site, store, now, notifier)
+    assert store.has_successful_check("official-jp") is False
+
+
+def test_a_set_recognised_as_brown_dust_2_later_still_alerts(config, store, now, jp_site, notifier):
+    check(config, "official-jp", jp_site, store, now, notifier)
+    jp_site.add('<li><a href="/products/xyz_eb/">エクストラブースター</a></li>')
+    check(config, "official-jp", jp_site, store, now + timedelta(hours=1), notifier)
+    assert notifier.sent == []
+
+    jp_site.html = jp_site.html.replace(">エクストラブースター<", ">エクストラブースター ブラウンダスト2<")
+    check(config, "official-jp", jp_site, store, now + timedelta(hours=2), notifier)
+    assert [(a.event, a.announcement.set_id) for a in notifier.sent] == [("new_set", "xyz_eb")]
+    assert store.digest_queue() == []
+
+
+def test_a_failing_set_alert_stops_retrying_after_the_cooldown(config, store, now, jp_site):
+    class Broken:
+        channel = label = "discord"
+        calls = 0
+
+        def send(self, alert):
+            Broken.calls += 1
+            raise RuntimeError("webhook 404")
+
+    run_official_check(config.source("official-jp"), config, jp_site, store, now, [Broken()])
+    jp_site.add(NEW_BD2_PRODUCT)
+    for hours in range(1, 10):
+        run_official_check(config.source("official-jp"), config, jp_site, store, now + timedelta(hours=hours), [Broken()])
+    assert Broken.calls == 7  # first try at hour 1, retries through hour 7 (6 hours later), then it stops

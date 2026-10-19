@@ -1,8 +1,6 @@
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-
-from datetime import date
 
 from bd2watcher.models import Alert, Announcement, Check, Event, Listing, SetAlert
 
@@ -243,6 +241,10 @@ class Store:
         rows = self.db.execute(f"SELECT {SET_COLUMNS} FROM sets WHERE in_digest_queue = 1 ORDER BY first_seen, title")
         return [_announcement(r) for r in rows]
 
+    def unqueue(self, source: str, set_id: str) -> None:
+        with self.db:
+            self.db.execute("UPDATE sets SET in_digest_queue = 0 WHERE source = ? AND set_id = ?", (source, set_id))
+
     def clear_digest_queue(self, announcements: list[Announcement]) -> None:
         with self.db:
             self.db.executemany("UPDATE sets SET in_digest_queue = 0 WHERE source = ? AND set_id = ?",
@@ -261,9 +263,9 @@ class Store:
         rows = self.db.execute(
             f"SELECT set_alerts.kind, set_alerts.channel, {SET_COLUMNS} FROM set_alerts"
             " JOIN sets ON sets.source = set_alerts.source AND sets.set_id = set_alerts.set_id"
-            " WHERE set_alerts.source = ? AND set_alerts.sent_at >= ?"
+            " WHERE set_alerts.source = ?"
             " GROUP BY set_alerts.source, set_alerts.set_id, set_alerts.kind, set_alerts.channel"
-            " HAVING MAX(set_alerts.ok) = 0",
+            " HAVING MAX(set_alerts.ok) = 0 AND MIN(set_alerts.sent_at) >= ?",
             (source, since.isoformat()),
         ).fetchall()
         return [(_announcement(r[2:]), r[0], r[1]) for r in rows]

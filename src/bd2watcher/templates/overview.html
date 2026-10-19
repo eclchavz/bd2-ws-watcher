@@ -35,7 +35,7 @@
     <td>{% if s.series and s.series in series_on_sale %}<a href="#watched">store listings</a>{% endif %}</td>
   </tr>
   {% else %}
-  <tr><td colspan="3" class="muted">No sets yet. Official sites are checked hourly.</td></tr>
+  <tr><td colspan="3" class="muted">No sets yet. Official sites are checked every {{ official_minutes }} minutes.</td></tr>
   {% endfor %}
 </table>
 </section>

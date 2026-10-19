@@ -12,6 +12,8 @@ ROUTES = {
     "new_listing": ("discord",),
     "restock": ("discord",),
     "preorder_opened": ("discord",),
+    "new_set": ("discord",),           # watched-series sets only; others go to the digest
+    "english_release": ("discord",),
 }
 
 
@@ -42,9 +44,14 @@ def deliver(events: list[Event], source: Source, config: Config, store: Store, n
 
 def _send(notifier, event_id: int, event: Event, source: Source, store: Store, now: datetime) -> None:
     alert = Alert(event.kind, notifier.label, event.listing, source.display_name, now)
+    send(notifier, alert, lambda ok, error=None: store.record_alert(event_id, alert, ok=ok, error=error))
+
+
+def send(notifier, alert, record) -> None:
+    """Send one alert and record the outcome. A failure is logged and recorded, never raised."""
     try:
         notifier.send(alert)
-        store.record_alert(event_id, alert, ok=True)
+        record(True)
     except Exception as e:
-        log.exception("Sending %s alert to %s failed", event.kind, notifier.label)
-        store.record_alert(event_id, alert, ok=False, error=f"{type(e).__name__}: {e}")
+        log.exception("Sending %s alert to %s failed", alert.event, notifier.label)
+        record(False, f"{type(e).__name__}: {e}")

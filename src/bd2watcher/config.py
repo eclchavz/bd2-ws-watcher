@@ -74,7 +74,7 @@ class Source(BaseModel):
     currency: str = ""
 
     @model_validator(mode="after")
-    def _html_needs_selectors(self):
+    def _check_adapter_settings(self):
         if self.adapter == "html" and self.html is None:
             raise ValueError(f"source {self.name!r} uses the html adapter but has no html: selectors")
         if self.adapter != "official" and not self.currency:
