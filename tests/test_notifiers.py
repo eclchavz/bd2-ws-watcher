@@ -51,7 +51,7 @@ def test_dry_run_records_the_alert_as_dry_run_and_sends_nothing(config, store, t
     caplog.set_level("INFO")
     restock_trial_deck(config, store, tcg_corner, now, [DryRunNotifier("discord")])
 
-    assert [(a.event, a.channel) for a in store.alerts()] == [("restock", "dry-run")]
+    assert [(a.event, a.channel) for a in store.alerts()] == [("restock", "dry-run discord")]
     assert "IN STOCK" in caplog.text
 
 
@@ -79,7 +79,7 @@ def test_run_refuses_to_start_without_a_webhook_unless_dry_run(config, monkeypat
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
     with pytest.raises(SystemExit):
         build_notifiers(config, dry_run=False)
-    assert [n.label for n in build_notifiers(config, dry_run=True)] == ["dry-run"]
+    assert [n.label for n in build_notifiers(config, dry_run=True)] == ["dry-run discord"]
 
 
 def test_dry_run_flag_works_after_the_subcommand(monkeypatch):
@@ -91,4 +91,4 @@ def test_dry_run_flag_works_after_the_subcommand(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["bd2watcher", "send-test-alert", "discord", "--dry-run"])
     monkeypatch.setattr(cli, "send_test_alert", lambda notifiers, channel: seen.update(labels=[n.label for n in notifiers]))
     cli.main()
-    assert seen["labels"] == ["dry-run"]
+    assert seen["labels"] == ["dry-run discord"]
