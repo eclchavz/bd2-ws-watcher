@@ -1,8 +1,10 @@
 from pathlib import Path
 from typing import Literal
 
+import re
+
 import yaml
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class Intervals(BaseModel):
@@ -30,7 +32,16 @@ class KindRules(BaseModel):
 class Alerts(BaseModel):
     cooldown_hours: float = 6
     dry_run: bool = False
-    digest_time: str = "09:00"  # local time (TZ) for the daily Weiss Schwarz email
+    digest_time: str = "09:00"  # local time (TZ) for the daily Weiss Schwarz email, as "HH:MM"
+    ntfy: bool = False  # push alerts to NTFY_URL too
+
+    @field_validator("digest_time")
+    @classmethod
+    def _hh_mm(cls, value: str) -> str:
+        match = re.fullmatch(r"(\d{2}):(\d{2})", value)
+        if not match or int(match[1]) > 23 or int(match[2]) > 59:
+            raise ValueError(f'digest_time must be "HH:MM" in 24-hour time (quoted in YAML), not {value!r}')
+        return value
 
 
 class ProductRule(BaseModel):

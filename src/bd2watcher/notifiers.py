@@ -1,6 +1,5 @@
 import logging
 import smtplib
-from datetime import datetime
 from email.message import EmailMessage
 from urllib.parse import urlsplit
 
@@ -85,7 +84,7 @@ class EmailNotifier:
     def send(self, alert: Alert | SetAlert) -> None:
         self._mail(plain_headline(alert), plain_body(alert))
 
-    def send_digest(self, announcements: list[Announcement], now: datetime) -> None:
+    def send_digest(self, announcements: list[Announcement]) -> None:
         count = len(announcements)
         self._mail(f"{count} new Weiss Schwarz set{'s' if count != 1 else ''}", format_digest(announcements))
 
@@ -106,8 +105,11 @@ class NtfyNotifier:
 
     def __init__(self, topic_url: str, transport: httpx.BaseTransport | None = None):
         parts = urlsplit(topic_url)
-        self.server = f"{parts.scheme}://{parts.netloc}/"
-        self.topic = parts.path.strip("/")
+        prefix, _, topic = parts.path.strip("/").rpartition("/")
+        if parts.scheme not in ("http", "https") or not parts.netloc or not topic:
+            raise ValueError(f"NTFY_URL must look like https://ntfy.sh/your-topic, not {topic_url!r}")
+        self.server = f"{parts.scheme}://{parts.netloc}/{prefix + '/' if prefix else ''}"
+        self.topic = topic
         self.client = httpx.Client(timeout=20, transport=transport)
 
     def send(self, alert: Alert | SetAlert) -> None:
@@ -121,13 +123,14 @@ class NtfyNotifier:
 class DryRunNotifier:
     """Logs instead of sending. Stands in for a real channel so routing stays the same."""
 
-    label = "dry-run"
+    dry_run = True
 
     def __init__(self, channel: str):
         self.channel = channel
+        self.label = f"dry-run {channel}"
 
     def send(self, alert: Alert | SetAlert) -> None:
         log.info("[dry-run %s] %s", self.channel, format_alert(alert).replace("\n", " | "))
 
-    def send_digest(self, announcements: list[Announcement], now: datetime) -> None:
+    def send_digest(self, announcements: list[Announcement]) -> None:
         log.info("[dry-run %s] digest: %s", self.channel, format_digest(announcements).replace("\n", " | "))

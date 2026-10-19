@@ -1,16 +1,14 @@
 import logging
-from datetime import datetime
 
-from bd2watcher.config import Config
 from bd2watcher.store import Store
 
 log = logging.getLogger(__name__)
 
 
-def run_digest(config: Config, store: Store, notifiers, now: datetime) -> None:
+def run_digest(store: Store, notifiers) -> None:
     """Email the queued Weiss Schwarz sets as one message, then clear the queue. Quiet days send nothing.
 
-    If sending fails, the queue is kept and goes out with tomorrow's digest.
+    If sending fails, or it's a dry run, the queue is kept and goes out with the next digest.
     """
     queue = store.digest_queue()
     if not queue:
@@ -21,8 +19,10 @@ def run_digest(config: Config, store: Store, notifiers, now: datetime) -> None:
         return
     try:
         for notifier in senders:
-            notifier.send_digest(queue, now)
+            notifier.send_digest(queue)
     except Exception:
         log.exception("Sending the digest failed; keeping %d sets for next time", len(queue))
+        return
+    if any(getattr(n, "dry_run", False) for n in senders):
         return
     store.clear_digest_queue(queue)

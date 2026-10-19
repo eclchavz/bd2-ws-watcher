@@ -10,5 +10,5 @@
 - [x] A Seam 1 test: at 9:00 AM (fake clock), queued sets go out in one email, and a second run that day sends nothing
 - [x] A Seam 1 test: with an empty queue, no email is sent
 - [x] Gmail address and app password come only from `.env`, and the README walks through creating an app password
-- [x] ntfy is available as an optional channel, switched on in config (off by default)
+- [x] ntfy is available as an optional channel, switched on in config (`alerts.ntfy`, off by default) with NTFY_URL in .env
 - [x] The routing table matches the spec (`source_broken` stays Discord-only, `price_changed` never alerts)

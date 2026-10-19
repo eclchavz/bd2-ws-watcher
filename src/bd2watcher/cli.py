@@ -8,6 +8,7 @@ import threading
 
 import uvicorn
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from bd2watcher.config import Config, load_config
 from bd2watcher.cycle import find_watched, run_check
@@ -41,27 +42,27 @@ def check_now(config: Config, fetcher, source_names: list[str]) -> None:
 def build_notifiers(config: Config, dry_run: bool) -> list:
     """One notifier per channel, from secrets in the environment. Dry run swaps each for a logger.
 
-    Discord is required. Email (instant alerts plus the daily digest) and ntfy are optional.
+    Discord is required. Email (instant alerts plus the daily digest) is on when its env vars are set;
+    ntfy when `alerts.ntfy` is true and NTFY_URL is set.
     """
     env = {k: os.environ.get(k, "").strip() for k in
            ("DISCORD_WEBHOOK_URL", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "NTFY_URL")}
-    channels = ["discord"]
-    if env["GMAIL_ADDRESS"] and env["GMAIL_APP_PASSWORD"]:
-        channels.append("email")
-    else:
-        log.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set: no email alerts and no daily digest")
-    if env["NTFY_URL"]:
-        channels.append("ntfy")
-    if dry_run or config.alerts.dry_run:
-        return [DryRunNotifier(c) for c in channels]
-    if not env["DISCORD_WEBHOOK_URL"]:
+    dry_run = dry_run or config.alerts.dry_run
+    if not dry_run and not env["DISCORD_WEBHOOK_URL"]:
         raise SystemExit("DISCORD_WEBHOOK_URL is not set in .env. Set it, or use --dry-run.")
-    made = {
-        "discord": lambda: DiscordNotifier(env["DISCORD_WEBHOOK_URL"]),
-        "email": lambda: EmailNotifier(env["GMAIL_ADDRESS"], env["GMAIL_APP_PASSWORD"]),
-        "ntfy": lambda: NtfyNotifier(env["NTFY_URL"]),
-    }
-    return [made[c]() for c in channels]
+    if config.alerts.ntfy and not env["NTFY_URL"]:
+        raise SystemExit("alerts.ntfy is true but NTFY_URL is not set in .env.")
+
+    notifiers = [DryRunNotifier("discord") if dry_run else DiscordNotifier(env["DISCORD_WEBHOOK_URL"])]
+    if env["GMAIL_ADDRESS"] and env["GMAIL_APP_PASSWORD"]:
+        notifiers.append(DryRunNotifier("email") if dry_run
+                         else EmailNotifier(env["GMAIL_ADDRESS"], env["GMAIL_APP_PASSWORD"]))
+    if config.alerts.ntfy:
+        try:
+            notifiers.append(DryRunNotifier("ntfy") if dry_run else NtfyNotifier(env["NTFY_URL"]))
+        except ValueError as e:
+            raise SystemExit(str(e))
+    return notifiers
 
 
 def send_test_alert(notifiers: list, channel: str) -> None:
@@ -75,7 +76,17 @@ def send_test_alert(notifiers: list, channel: str) -> None:
             notifier.send(Alert("restock", notifier.label, sample, "Test store", datetime.now(timezone.utc)))
             print(f"Sent a test alert via {notifier.label}")
             return
-    raise SystemExit(f"No notifier for channel {channel!r}")
+    hint = {"email": "set GMAIL_ADDRESS and GMAIL_APP_PASSWORD in .env",
+            "ntfy": "set NTFY_URL in .env and alerts.ntfy: true in config"}.get(channel, "")
+    raise SystemExit(f"Channel {channel!r} isn't set up: {hint}")
+
+
+DIGEST_JOB_OPTIONS = {"misfire_grace_time": 6 * 3600, "coalesce": True}  # a late start still sends that day
+
+
+def digest_trigger(config: Config, tz: str) -> CronTrigger:
+    hour, minute = (int(x) for x in config.alerts.digest_time.split(":"))
+    return CronTrigger(hour=hour, minute=minute, timezone=tz)
 
 
 def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
@@ -117,12 +128,13 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
     def digest() -> None:
         store = Store(db_path)
         try:
-            run_digest(config, store, notifiers, datetime.now(timezone.utc))
+            run_digest(store, notifiers)
         finally:
             store.close()
 
-    hour, minute = (int(x) for x in config.alerts.digest_time.split(":"))
-    scheduler.add_job(digest, "cron", hour=hour, minute=minute, timezone=os.environ.get("TZ") or "UTC", id="digest")
+    if not any(n.channel == "email" for n in notifiers):
+        log.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set: no email alerts and no daily digest")
+    scheduler.add_job(digest, digest_trigger(config, os.environ.get("TZ") or "UTC"), id="digest", **DIGEST_JOB_OPTIONS)
     scheduler.start()
 
 

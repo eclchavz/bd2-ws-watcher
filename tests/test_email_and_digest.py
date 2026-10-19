@@ -20,7 +20,7 @@ class EmailRecorder(RecordingNotifier):
         super().__init__()
         self.digests = []
 
-    def send_digest(self, announcements, now):
+    def send_digest(self, announcements):
         self.digests.append([a.title for a in announcements])
 
 
@@ -67,12 +67,10 @@ def test_a_brown_dust_2_restock_goes_to_discord_and_email(config, store, now, tc
     assert sorted((a.event, a.channel) for a in store.alerts()) == [("restock", "discord"), ("restock", "email")]
 
 
-def test_the_digest_sends_queued_sets_once_at_nine(config, queued_sets):
+def test_the_digest_sends_all_queued_sets_in_one_email_then_empties_the_queue(config, queued_sets):
     email = EmailRecorder()
-    nine = datetime(2026, 10, 18, 9, 0, tzinfo=PHOENIX)
-
-    run_digest(config, queued_sets, [email], nine)
-    run_digest(config, queued_sets, [email], nine + timedelta(hours=3))
+    run_digest(queued_sets, [email])
+    run_digest(queued_sets, [email])
 
     assert email.digests == [["ブースターパック 【推しの子】 Vol.3", "ブースターパック 葬送のフリーレン Vol.2"]]
     assert queued_sets.digest_queue() == []
@@ -80,16 +78,16 @@ def test_the_digest_sends_queued_sets_once_at_nine(config, queued_sets):
 
 def test_no_digest_email_on_a_quiet_day(config, store, now):
     email = EmailRecorder()
-    run_digest(config, store, [email], now)
+    run_digest(store, [email])
     assert email.digests == []
 
 
 def test_a_failed_digest_keeps_the_queue_for_tomorrow(config, queued_sets, now):
     class Down(EmailRecorder):
-        def send_digest(self, announcements, now):
+        def send_digest(self, announcements):
             raise OSError("smtp down")
 
-    run_digest(config, queued_sets, [Down()], now)
+    run_digest(queued_sets, [Down()])
     assert len(queued_sets.digest_queue()) == 2
 
 
@@ -113,7 +111,7 @@ def test_email_goes_from_and_to_the_gmail_address_with_the_app_password(config, 
 
 def test_digest_email_lists_each_set_with_date_and_link(config, queued_sets, now):
     FakeSMTP.instances.clear()
-    run_digest(config, queued_sets, [EmailNotifier("me@gmail.com", "pw", smtp=FakeSMTP)], now)
+    run_digest(queued_sets, [EmailNotifier("me@gmail.com", "pw", smtp=FakeSMTP)])
 
     [smtp] = FakeSMTP.instances
     message = message_from_string(smtp.sent[0][2])
@@ -152,10 +150,50 @@ def test_email_and_ntfy_come_from_env_and_are_optional(config, monkeypatch, capl
     monkeypatch.delenv("GMAIL_APP_PASSWORD", raising=False)
     monkeypatch.delenv("NTFY_URL", raising=False)
     assert [n.channel for n in build_notifiers(config, dry_run=False)] == ["discord"]
-    assert "GMAIL_ADDRESS" in caplog.text
 
     monkeypatch.setenv("GMAIL_ADDRESS", "me@gmail.com")
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "pw")
     monkeypatch.setenv("NTFY_URL", "https://ntfy.sh/topic")
+    assert [n.channel for n in build_notifiers(config, dry_run=False)] == ["discord", "email"]  # ntfy off in config
+    config.alerts.ntfy = True
     assert [n.channel for n in build_notifiers(config, dry_run=False)] == ["discord", "email", "ntfy"]
-    assert [n.label for n in build_notifiers(config, dry_run=True)] == ["dry-run"] * 3
+    assert [n.label for n in build_notifiers(config, dry_run=True)] == [
+        "dry-run discord", "dry-run email", "dry-run ntfy"]
+
+
+def test_the_digest_fires_at_nine_arizona_time_every_day(config):
+    from bd2watcher.cli import digest_trigger
+
+    trigger = digest_trigger(config, "America/Phoenix")
+    first = trigger.get_next_fire_time(None, datetime(2026, 10, 18, 8, 30, tzinfo=PHOENIX))
+    second = trigger.get_next_fire_time(first, first + timedelta(seconds=1))
+    assert first == datetime(2026, 10, 18, 9, 0, tzinfo=PHOENIX)
+    assert second - first == timedelta(days=1)
+
+
+def test_a_late_start_still_sends_that_mornings_digest(config):
+    from bd2watcher.cli import DIGEST_JOB_OPTIONS
+
+    assert DIGEST_JOB_OPTIONS["misfire_grace_time"] >= 3600 and DIGEST_JOB_OPTIONS["coalesce"] is True
+
+
+def test_dry_run_digest_keeps_the_queue(config, queued_sets):
+    from bd2watcher.notifiers import DryRunNotifier
+
+    run_digest(queued_sets, [DryRunNotifier("email")])
+    assert len(queued_sets.digest_queue()) == 2
+
+
+@pytest.mark.parametrize("value", ["9:00 AM", "0900", "09:00:00", 540, "25:00"])
+def test_a_bad_digest_time_is_rejected_when_config_loads(value):
+    from bd2watcher.config import Alerts
+
+    with pytest.raises(ValueError):
+        Alerts(digest_time=value)
+
+
+def test_ntfy_keeps_a_path_prefix_and_rejects_a_url_without_scheme():
+    ntfy = NtfyNotifier("https://example.com/ntfy/bd2")
+    assert (ntfy.server, ntfy.topic) == ("https://example.com/ntfy/", "bd2")
+    with pytest.raises(ValueError):
+        NtfyNotifier("ntfy.sh/topic")

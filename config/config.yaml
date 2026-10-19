@@ -7,7 +7,8 @@ intervals:
 alerts:
   cooldown_hours: 6
   dry_run: false   # true logs alerts instead of sending them
-  digest_time: "09:00"   # daily email of other new Weiss Schwarz sets, in TZ (America/Phoenix)
+  digest_time: "09:00"   # daily email of other new Weiss Schwarz sets, in TZ (America/Phoenix). Keep the quotes.
+  ntfy: false            # true also pushes alerts to NTFY_URL (set in .env)
 
 user_agent: "bd2-ws-watcher/0.1 (personal stock checker; +https://github.com/eclchavz/bd2-ws-watcher)"
 
