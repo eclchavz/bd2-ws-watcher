@@ -14,7 +14,8 @@ from bd2watcher.cycle import find_watched, run_check
 from bd2watcher.discover import capture_fixture, discover
 from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
-from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier
+from bd2watcher.digest import run_digest
+from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier, EmailNotifier, NtfyNotifier
 from bd2watcher.official import fetch as fetch_official, run_official_check
 from bd2watcher.store import Store
 from bd2watcher.web import create_app
@@ -38,13 +39,29 @@ def check_now(config: Config, fetcher, source_names: list[str]) -> None:
 
 
 def build_notifiers(config: Config, dry_run: bool) -> list:
-    """One notifier per channel, from secrets in the environment. Dry run swaps each for a logger."""
-    webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+    """One notifier per channel, from secrets in the environment. Dry run swaps each for a logger.
+
+    Discord is required. Email (instant alerts plus the daily digest) and ntfy are optional.
+    """
+    env = {k: os.environ.get(k, "").strip() for k in
+           ("DISCORD_WEBHOOK_URL", "GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "NTFY_URL")}
+    channels = ["discord"]
+    if env["GMAIL_ADDRESS"] and env["GMAIL_APP_PASSWORD"]:
+        channels.append("email")
+    else:
+        log.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set: no email alerts and no daily digest")
+    if env["NTFY_URL"]:
+        channels.append("ntfy")
     if dry_run or config.alerts.dry_run:
-        return [DryRunNotifier("discord")]
-    if not webhook:
+        return [DryRunNotifier(c) for c in channels]
+    if not env["DISCORD_WEBHOOK_URL"]:
         raise SystemExit("DISCORD_WEBHOOK_URL is not set in .env. Set it, or use --dry-run.")
-    return [DiscordNotifier(webhook)]
+    made = {
+        "discord": lambda: DiscordNotifier(env["DISCORD_WEBHOOK_URL"]),
+        "email": lambda: EmailNotifier(env["GMAIL_ADDRESS"], env["GMAIL_APP_PASSWORD"]),
+        "ntfy": lambda: NtfyNotifier(env["NTFY_URL"]),
+    }
+    return [made[c]() for c in channels]
 
 
 def send_test_alert(notifiers: list, channel: str) -> None:
@@ -96,6 +113,16 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
         name="dashboard", daemon=True,
     ).start()
     log.info("Dashboard on port %d", port)
+
+    def digest() -> None:
+        store = Store(db_path)
+        try:
+            run_digest(config, store, notifiers, datetime.now(timezone.utc))
+        finally:
+            store.close()
+
+    hour, minute = (int(x) for x in config.alerts.digest_time.split(":"))
+    scheduler.add_job(digest, "cron", hour=hour, minute=minute, timezone=os.environ.get("TZ") or "UTC", id="digest")
     scheduler.start()
 
 
@@ -112,7 +139,7 @@ def main() -> None:
     capture_parser.add_argument("source")
     capture_parser.add_argument("--out", default="tests/fixtures")
     test_parser = commands.add_parser("send-test-alert", parents=[dry_run], help="send a sample alert to one channel")
-    test_parser.add_argument("channel", choices=["discord"])
+    test_parser.add_argument("channel", choices=["discord", "email", "ntfy"])
     check_parser = commands.add_parser("check-now", help="check live and print, without saving")
     check_parser.add_argument("sources", nargs="*", help="source names (default: all enabled sources)")
     args = parser.parse_args()

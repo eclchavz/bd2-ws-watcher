@@ -30,6 +30,7 @@ class KindRules(BaseModel):
 class Alerts(BaseModel):
     cooldown_hours: float = 6
     dry_run: bool = False
+    digest_time: str = "09:00"  # local time (TZ) for the daily Weiss Schwarz email
 
 
 class ProductRule(BaseModel):

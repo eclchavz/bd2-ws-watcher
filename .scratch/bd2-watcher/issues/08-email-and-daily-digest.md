@@ -4,11 +4,11 @@
 
 **Blocked by:** 02, 06
 
-**Status:** ready-for-agent
+**Status:** done (on branch `ticket/08-email-digest`). A real Gmail send still needs the user's app password.
 
-- [ ] A Seam 1 test: a Brown Dust 2 restock records alerts on both `discord` and `email`
-- [ ] A Seam 1 test: at 9:00 AM (fake clock), queued sets go out in one email, and a second run that day sends nothing
-- [ ] A Seam 1 test: with an empty queue, no email is sent
-- [ ] Gmail address and app password come only from `.env`, and the README walks through creating an app password
-- [ ] ntfy is available as an optional channel, switched on in config (off by default)
-- [ ] The routing table matches the spec (`source_broken` stays Discord-only, `price_changed` never alerts)
+- [x] A Seam 1 test: a Brown Dust 2 restock records alerts on both `discord` and `email`
+- [x] A Seam 1 test: at 9:00 AM (fake clock), queued sets go out in one email, and a second run that day sends nothing
+- [x] A Seam 1 test: with an empty queue, no email is sent
+- [x] Gmail address and app password come only from `.env`, and the README walks through creating an app password
+- [x] ntfy is available as an optional channel, switched on in config (off by default)
+- [x] The routing table matches the spec (`source_broken` stays Discord-only, `price_changed` never alerts)

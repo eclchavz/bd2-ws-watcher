@@ -16,6 +16,26 @@ docker compose logs -f      # watch the checks
 
 The database lives in `./data/`, so it survives restarts and rebuilds. Sources, keywords and intervals are in `config/config.yaml`. After editing the config, run `docker compose restart`.
 
+## Alerts
+
+| What | Discord | Email | ntfy (optional) |
+|---|---|---|---|
+| Brown Dust 2 new product, restock, preorder, official announcement, English release | right away | right away | right away |
+| Other new Weiss Schwarz sets | | daily summary at 9:00 AM (`digest_time`) | |
+
+Test a channel with `docker compose run --rm bd2watcher bd2watcher send-test-alert discord` (or `email`, `ntfy`).
+
+### Setting up Gmail
+
+Gmail needs an **app password**, not your normal password:
+
+1. Turn on 2-Step Verification for your Google account (Google Account, then Security).
+2. Go to https://myaccount.google.com/apppasswords, create one named "bd2-watcher", and copy the 16-character password.
+3. In `.env`, set `GMAIL_ADDRESS=you@gmail.com` and `GMAIL_APP_PASSWORD=<the 16 characters>`.
+4. Run `docker compose restart`, then `send-test-alert email`.
+
+Alerts are sent from and to that same address.
+
 ## Dashboard
 
 Open http://localhost:8080 on the PC, or `http://<the PC's IP address>:8080` from your phone on the same Wi-Fi. To find the PC's IP on Windows, run `ipconfig` and look for "IPv4 Address".

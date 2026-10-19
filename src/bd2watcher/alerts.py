@@ -7,13 +7,14 @@ from bd2watcher.store import Store
 
 log = logging.getLogger(__name__)
 
-# Which channels each event goes to. Email joins these in ticket 08.
+# Which channels each event goes to. ntfy only exists when NTFY_URL is set.
+WATCHED = ("discord", "email", "ntfy")
 ROUTES = {
-    "new_listing": ("discord",),
-    "restock": ("discord",),
-    "preorder_opened": ("discord",),
-    "new_set": ("discord",),           # watched-series sets only; others go to the digest
-    "english_release": ("discord",),
+    "new_listing": WATCHED,
+    "restock": WATCHED,
+    "preorder_opened": WATCHED,
+    "new_set": WATCHED,           # watched-series sets only; others go to the email digest
+    "english_release": WATCHED,
 }
 
 
