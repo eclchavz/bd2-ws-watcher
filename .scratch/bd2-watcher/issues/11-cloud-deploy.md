@@ -10,6 +10,6 @@ The dashboard is bound to loopback and published with `tailscale serve` instead 
 
 - [x] The container's memory stays under about 700 MB during a full check cycle (measured: about 50 MB)
 - [x] The guide covers creating the e2-micro within free-tier limits, installing Docker and Tailscale, copying `.env` and the database, and starting the app
-- [ ] The dashboard port is bound to the Tailscale interface only, and a check from outside the tailnet confirms it's unreachable
+- [ ] The dashboard is bound to the server's loopback only (`ss -tlnp` shows `127.0.0.1:8080`), is published to the tailnet with `tailscale serve`, and a check from outside the tailnet confirms it's unreachable (needs the user's server)
 - [ ] The container restarts automatically after a reboot
 - [x] The guide includes a short Hetzner section as the fallback

@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+import signal
+import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -123,7 +125,8 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
             check, "interval", args=[source.name], minutes=every, jitter=every * 6,
             next_run_time=datetime.now(timezone.utc), id=source.name, max_instances=1,
         )
-    app = create_app(config, Store(db_path))
+    dashboard_store = Store(db_path)
+    app = create_app(config, dashboard_store)
     threading.Thread(
         target=uvicorn.run, args=(app,), kwargs={"host": "0.0.0.0", "port": port, "log_level": "warning"},
         name="dashboard", daemon=True,
@@ -150,8 +153,15 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
 
     if not any(n.channel == "email" for n in notifiers):
         log.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set: no email alerts and no daily digest")
+    # docker stop sends SIGTERM; exit cleanly so SQLite folds its write-ahead log back into the database.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     scheduler.add_job(digest, digest_trigger(config, os.environ.get("TZ") or "UTC"), id="digest", **DIGEST_JOB_OPTIONS)
-    scheduler.start()
+    try:
+        scheduler.start()
+    finally:
+        if scheduler.running:
+            scheduler.shutdown(wait=True)  # let a running check finish and close its connection
+        dashboard_store.close()  # the last connection to close checkpoints the WAL into the database
 
 
 def main() -> None:
