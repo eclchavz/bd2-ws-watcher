@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from bd2watcher.config import Config
+from bd2watcher.health import BROKEN_AFTER
 from bd2watcher.notifiers import STOCK_WORDS, price_text, usd
 from bd2watcher.store import Store
 
@@ -74,6 +75,7 @@ def create_app(config: Config, store: Store) -> FastAPI:
             "series_on_sale": {l.series for l in listings},
             "official_minutes": config.intervals.official_minutes,
             "sources": [(s.name, labels[s.name], checks[s.name], streaks[s.name]) for s in enabled],
+            "broken_after": BROKEN_AFTER,
         })
 
     @app.get("/product", response_class=HTMLResponse)

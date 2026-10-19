@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 
 BROKEN_AFTER = 3
 MAX_BACKOFF = timedelta(hours=2)
+JITTER_ALLOWANCE = 0.25  # of an interval: the scheduler fires up to 10% early or late
 
 
 def interval(source: Source, config: Config) -> timedelta:
@@ -21,25 +22,39 @@ def due(source: Source, config: Config, store: Store, now: datetime) -> bool:
     failures, last = store.failure_streak(source.name)
     if failures == 0:
         return True
-    wait = min(interval(source, config) * 2 ** (failures - 1), MAX_BACKOFF)
-    return now - last >= wait
+    every = interval(source, config)
+    wait = min(every * 2 ** (failures - 1), MAX_BACKOFF)
+    return now - last >= wait - every * JITTER_ALLOWANCE
 
 
 def after_check(source: Source, store: Store, notifiers, now: datetime, error: str | None) -> None:
-    """Send source_broken when a source reaches 3 failed checks in a row, and source_recovered when it comes back.
+    """Tell Discord when a source breaks (3 failed checks in a row) and when it recovers.
 
-    Call after the check has been recorded.
+    Whether a source is broken is stored, not inferred, so a notice that fails to send is retried after the
+    next check, and "recovered" is only ever sent after "broken" was.
     """
-    failures, _ = store.failure_streak(source.name)
-    if error is not None and failures == BROKEN_AFTER:
-        _notify("source_broken", source, store, notifiers, now, error)
-    elif error is None and store.failures_before_last_check(source.name) >= BROKEN_AFTER:
-        _notify("source_recovered", source, store, notifiers, now, None)
+    broken = store.is_marked_broken(source.name)
+    if error is not None and not broken and store.failure_streak(source.name)[0] >= BROKEN_AFTER:
+        if _notify("source_broken", source, notifiers, now, error):
+            store.mark_broken(source.name, True)
+    elif error is None and broken:
+        if _notify("source_recovered", source, notifiers, now, None):
+            store.mark_broken(source.name, False)
 
 
-def _notify(kind: str, source: Source, store: Store, notifiers, now: datetime, error: str | None) -> None:
+def safely_after_check(source: Source, store: Store, notifiers, now: datetime, error: str | None) -> None:
+    """after_check that never raises, so a health problem can't hide or break the check itself."""
+    try:
+        after_check(source, store, notifiers, now, error)
+    except Exception:
+        log.exception("Source health update for %s failed", source.name)
+
+
+def _notify(kind: str, source: Source, notifiers, now: datetime, error: str | None) -> bool:
+    """Send to every routed channel. True if at least one send succeeded."""
+    delivered = []
     for notifier in notifiers:
         if notifier.channel in ROUTES[kind]:
             alert = SourceAlert(kind, notifier.label, source.name, source.display_name, error, now)
-            send(notifier, alert, lambda ok, err=None: log.info("%s for %s via %s: %s", kind, source.name,
-                                                                 notifier.label, "sent" if ok else err))
+            send(notifier, alert, lambda ok, err=None: delivered.append(ok))
+    return any(delivered)

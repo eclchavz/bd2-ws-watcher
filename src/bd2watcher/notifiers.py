@@ -40,7 +40,7 @@ def format_alert(alert: Alert | SetAlert | SourceAlert) -> str:
     if isinstance(alert, SourceAlert):
         if alert.event == "source_broken":
             return (f"**{HEADLINES[alert.event]}** · {alert.source_label}\n"
-                    f"3 checks in a row failed, so alerts from it may be missed. Last error: {alert.error}")
+                    f"Several checks in a row failed, so alerts from it may be missed. Last error: {alert.error}")
         return f"**{HEADLINES[alert.event]}** · {alert.source_label}\nChecks are working again."
     if isinstance(alert, SetAlert):
         a = alert.announcement

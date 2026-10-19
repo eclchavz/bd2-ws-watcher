@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS fx_rates (
     usd_rate TEXT NOT NULL,
     fetched_at TEXT NOT NULL
 );
+-- Sources we've told the user are broken; cleared once "recovered" is sent.
+CREATE TABLE IF NOT EXISTS broken_sources (source TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS sets (
     source TEXT NOT NULL,
     set_id TEXT NOT NULL,
@@ -321,27 +323,22 @@ class Store:
 
     def failure_streak(self, source: str) -> tuple[int, datetime | None]:
         """(failed checks in a row up to now, time of the latest one)."""
-        rows = self.db.execute(
-            "SELECT ok, checked_at FROM source_checks WHERE source = ? ORDER BY id DESC LIMIT 50", (source,)
-        ).fetchall()
-        streak = 0
-        for ok, _ in rows:
-            if ok:
-                break
-            streak += 1
-        return streak, datetime.fromisoformat(rows[0][1]) if streak else None
+        count, last = self.db.execute(
+            "SELECT COUNT(*), MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 0"
+            " AND id > COALESCE((SELECT MAX(id) FROM source_checks WHERE source = ? AND ok = 1), 0)",
+            (source, source),
+        ).fetchone()
+        return count, datetime.fromisoformat(last) if last else None
 
-    def failures_before_last_check(self, source: str) -> int:
-        """Failed checks in a row just before the latest check."""
-        rows = self.db.execute(
-            "SELECT ok FROM source_checks WHERE source = ? ORDER BY id DESC LIMIT 51", (source,)
-        ).fetchall()[1:]
-        streak = 0
-        for (ok,) in rows:
-            if ok:
-                break
-            streak += 1
-        return streak
+    def is_marked_broken(self, source: str) -> bool:
+        return self.db.execute("SELECT 1 FROM broken_sources WHERE source = ?", (source,)).fetchone() is not None
+
+    def mark_broken(self, source: str, broken: bool) -> None:
+        with self.db:
+            if broken:
+                self.db.execute("INSERT OR IGNORE INTO broken_sources (source) VALUES (?)", (source,))
+            else:
+                self.db.execute("DELETE FROM broken_sources WHERE source = ?", (source,))
 
     def last_successful_check(self, source: str) -> datetime | None:
         row = self.db.execute("SELECT MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 1",

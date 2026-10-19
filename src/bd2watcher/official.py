@@ -104,7 +104,7 @@ def run_official_check(source: Source, config: Config, fetcher, store: Store, no
     except Exception as e:
         error = f"{type(e).__name__}: {e}"
         store.record_check(source.name, now, ok=False, listing_count=0, error=error)
-        health.after_check(source, store, notifiers, now, error)
+        health.safely_after_check(source, store, notifiers, now, error)
         raise
 
     baseline = not store.has_successful_check(source.name)
@@ -114,7 +114,7 @@ def run_official_check(source: Source, config: Config, fetcher, store: Store, no
     newly_watched = [a for a in announcements if a.series and not (a.set_id in before and before[a.set_id].series)]
     store.save_sets(announcements, now, queue_for_digest=[] if baseline else [a for a in new if not a.series])
     store.record_check(source.name, now, ok=True, listing_count=len(announcements))
-    health.after_check(source, store, notifiers, now, None)
+    health.safely_after_check(source, store, notifiers, now, None)
 
     cooldown = timedelta(hours=config.alerts.cooldown_hours)
     by_label = {n.label: n for n in notifiers}

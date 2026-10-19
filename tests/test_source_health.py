@@ -63,10 +63,11 @@ def test_official_sites_report_health_too(config, store, notifier, now):
     (0, 0, True),     # healthy: the scheduler's interval decides
     (1, 10, True),    # 1 failure: wait 1 interval (10 min)
     (2, 15, False),   # 2 failures: wait 2 intervals
+    (2, 18, True),    # the scheduler fires up to 10% of an interval early or late, so allow for it
     (2, 20, True),
     (4, 70, False),   # 4 failures: wait 8 intervals (80 min)
     (4, 80, True),
-    (9, 119, False),  # capped at 2 hours
+    (9, 115, False),  # capped at 2 hours (less the jitter allowance)
     (9, 120, True),
 ])
 def test_failing_sources_back_off_exponentially(config, store, now, failures, minutes_later, expected):
@@ -84,3 +85,44 @@ def test_dashboard_shows_the_failure_count_and_last_error(config, store, notifie
     page = TestClient(create_app(config, store)).get("/").text
     row = page.split('data-source="tcg-corner"', 1)[1].split("</tr>", 1)[0]
     assert "Broken" in row and "3 failed checks in a row" in row and "KeyError" in row
+
+
+def test_a_broken_notice_that_fails_to_send_is_retried_on_the_next_failure(config, store, tcg_corner, now):
+    from conftest import RecordingNotifier
+
+    class Flaky(RecordingNotifier):
+        fail_next = True
+
+        def send(self, alert):
+            if self.fail_next:
+                self.fail_next = False
+                raise OSError("discord down")
+            super().send(alert)
+
+    discord = Flaky()
+    for minutes in (0, 10, 20, 30):
+        with pytest.raises(Exception):
+            run_check(config.source("tcg-corner"), config, FakeFetcher({}), store, now + timedelta(minutes=minutes),
+                      [discord])
+    assert [a.event for a in discord.sent] == ["source_broken"]
+
+
+def test_no_recovered_notice_without_a_broken_one_first(config, store, notifier, tcg_corner, now):
+    for i in range(5):  # failures recorded by an older version that never sent a broken notice
+        store.record_check("tcg-corner", now - timedelta(hours=5 - i), ok=False, listing_count=0, error="x")
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now, [notifier])
+    assert notifier.sent == []
+
+
+def test_the_failure_count_is_not_capped(config, store, now):
+    for i in range(60):
+        store.record_check("tcg-corner", now + timedelta(minutes=i), ok=False, listing_count=0, error="x")
+    assert store.failure_streak("tcg-corner")[0] == 60
+
+
+def test_a_health_error_does_not_hide_the_check_error(config, store, notifier, now, monkeypatch):
+    from bd2watcher import health
+
+    monkeypatch.setattr(health, "after_check", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db locked")))
+    with pytest.raises(KeyError):
+        run_check(config.source("tcg-corner"), config, FakeFetcher({}), store, now, [notifier])

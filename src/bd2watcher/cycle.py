@@ -54,7 +54,7 @@ def run_check(source: Source, config: Config, fetcher, store: Store, now: dateti
     except Exception as e:
         error = f"{type(e).__name__}: {e}"
         store.record_check(source.name, now, ok=False, listing_count=0, error=error)
-        health.after_check(source, store, notifiers, now, error)
+        health.safely_after_check(source, store, notifiers, now, error)
         raise
     previous = {l.external_id: l for l in store.listings(source.name)}
     baseline = not store.has_successful_check(source.name)
@@ -70,6 +70,6 @@ def run_check(source: Source, config: Config, fetcher, store: Store, now: dateti
             store.add_price_point(l, now)
     store.mark_sold_out(source.name, missing)
     store.record_check(source.name, now, ok=True, listing_count=len(listings))
-    health.after_check(source, store, notifiers, now, None)
+    health.safely_after_check(source, store, notifiers, now, None)
     deliver(events, source, config, store, notifiers, now)
     return listings

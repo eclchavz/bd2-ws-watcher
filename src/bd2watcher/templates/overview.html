@@ -51,7 +51,7 @@
     <td>
       {% if not check %}<span class="muted">Waiting</span>
       {% elif check.ok %}<span class="ok">OK</span> <span class="muted">{{ check.listing_count }} watched</span>
-      {% else %}<span class="bad">{{ "Broken" if streak >= 3 else "Failing" }}</span>
+      {% else %}<span class="bad">{{ "Broken" if streak >= broken_after else "Failing" }}</span>
         <div class="muted">{{ streak }} failed check{{ "s" if streak != 1 }} in a row · {{ check.error }}</div>{% endif %}
     </td>
   </tr>

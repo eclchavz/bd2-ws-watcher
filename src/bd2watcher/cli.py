@@ -117,7 +117,7 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
             store.close()
 
     for source in config.enabled_sources:
-        every = config.intervals.official_minutes if source.is_official else minutes
+        every = int(health.interval(source, config).total_seconds() // 60)
         scheduler.add_job(
             # jitter is in seconds: minutes * 6 is 10% of the interval.
             check, "interval", args=[source.name], minutes=every, jitter=every * 6,
