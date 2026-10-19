@@ -15,6 +15,7 @@ ROUTES = {
     "preorder_opened": WATCHED,
     "new_set": WATCHED,           # watched-series sets only; others go to the email digest
     "english_release": WATCHED,
+    "price_changed": (),          # shown on the dashboard's price chart, never alerted (ADR 0002)
 }
 
 
@@ -34,6 +35,8 @@ def deliver(events: list[Event], source: Source, config: Config, store: Store, n
 
     for event in events:
         event_id = store.record_event(event)
+        if not ROUTES[event.kind]:
+            continue
         last = store.last_alert_at(event.listing.source, event.listing.external_id, event.kind)
         if last is not None and now - last < cooldown:
             log.info("Cooldown: not alerting %s for %s", event.kind, event.listing.title)
@@ -44,7 +47,8 @@ def deliver(events: list[Event], source: Source, config: Config, store: Store, n
 
 
 def _send(notifier, event_id: int, event: Event, source: Source, store: Store, now: datetime) -> None:
-    alert = Alert(event.kind, notifier.label, event.listing, source.display_name, now)
+    alert = Alert(event.kind, notifier.label, event.listing, source.display_name, now,
+                  usd_rate=store.usd_rate(event.listing.currency))
     send(notifier, alert, lambda ok, error=None: store.record_alert(event_id, alert, ok=ok, error=error))
 
 

@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 import smtplib
 from email.message import EmailMessage
 from urllib.parse import urlsplit
@@ -15,8 +16,22 @@ HEADLINES = {
     "preorder_opened": "📦 PREORDER OPEN",
     "new_set": "📣 ANNOUNCED",
     "english_release": "🇺🇸 ENGLISH RELEASE ANNOUNCED",
+    "price_changed": "💲 PRICE CHANGED",  # never routed to a channel, but formattable
 }
 STOCK_WORDS = {"in_stock": "in stock", "preorder": "preorder", "sold_out": "sold out", "unknown": "stock unknown"}
+
+
+def usd(price: Decimal, rate: Decimal) -> Decimal:
+    return (price * rate).quantize(Decimal("0.01"))
+
+
+def price_text(price: Decimal | None, currency: str, rate: Decimal | None) -> str:
+    """'54.99 USD', or '6200 JPY (~$41.54)' when a USD rate is known."""
+    if price is None:
+        return "price unknown"
+    if currency != "USD" and rate is not None:
+        return f"{price} {currency} (~${usd(price, rate)})"
+    return f"{price} {currency}"
 
 
 def format_alert(alert: Alert | SetAlert) -> str:
@@ -25,7 +40,7 @@ def format_alert(alert: Alert | SetAlert) -> str:
         release = f"releases {a.release_date.isoformat()}" if a.release_date else "release date not given yet"
         return f"**{HEADLINES[alert.event]}** · {a.title}\n{alert.source_label} · {release}\n{a.url}"
     l = alert.listing
-    price = "price unknown" if l.price is None else f"{l.price} {l.currency}"
+    price = price_text(l.price, l.currency, alert.usd_rate)
     return (
         f"**{HEADLINES[alert.event]}** · {l.title}\n"
         f"{alert.store_label} · {price} · {STOCK_WORDS[l.stock_state]}\n"

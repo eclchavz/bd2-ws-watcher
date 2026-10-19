@@ -6,12 +6,12 @@
   <tr><th>Product</th><th>Stores</th></tr>
   {% for row in rows %}
   <tr data-product="{{ row.product }}">
-    <td>{{ row.product }}<div class="muted">{{ row.kind }}</div></td>
+    <td><a href="{{ row.href }}">{{ row.product }}</a><div class="muted">{{ row.kind }}</div></td>
     <td>
-      {% for o in row.offers %}
+      {% for offer in row.offers %}{% set o = offer.listing %}
       <div class="offer">
         <a href="{{ o.url }}" rel="noreferrer" target="_blank">{{ labels.get(o.source, o.source) }}</a>
-        <span>{% if o.price is not none %}{{ o.price }} {{ o.currency }}{% else %}price unknown{% endif %}</span>
+        <span>{{ offer.price }}</span>
         <span class="{{ o.stock_state }}">{{ stock_words[o.stock_state] }}</span>
       </div>
       {% endfor %}

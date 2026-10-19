@@ -16,6 +16,7 @@ from bd2watcher.discover import capture_fixture, discover
 from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
 from bd2watcher.digest import run_digest
+from bd2watcher.fx import refresh_rates
 from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier, EmailNotifier, NtfyNotifier
 from bd2watcher.official import fetch as fetch_official, run_official_check
 from bd2watcher.store import Store
@@ -131,6 +132,17 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
             run_digest(store, notifiers)
         finally:
             store.close()
+
+    def rates() -> None:
+        store = Store(db_path)
+        try:
+            currencies = {s.currency for s in config.enabled_sources if not s.is_official}
+            refresh_rates(store, fetcher, currencies, datetime.now(timezone.utc), config.fx_url)
+        finally:
+            store.close()
+
+    # Tries every 6 hours; refresh_rates only calls the API once per UTC day, so the later tries are retries.
+    scheduler.add_job(rates, "interval", hours=6, next_run_time=datetime.now(timezone.utc), id="fx")
 
     if not any(n.channel == "email" for n in notifiers):
         log.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set: no email alerts and no daily digest")

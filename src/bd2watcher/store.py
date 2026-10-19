@@ -2,7 +2,7 @@ import sqlite3
 from datetime import date, datetime
 from decimal import Decimal
 
-from bd2watcher.models import Alert, Announcement, Check, Event, Listing, SetAlert
+from bd2watcher.models import Alert, Announcement, Check, Event, Listing, PricePoint, SetAlert
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS source_checks (
@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS events (
     currency TEXT NOT NULL,
     stock_state TEXT NOT NULL,
     product TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS price_points (
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    price TEXT NOT NULL,
+    currency TEXT NOT NULL,
+    at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS price_points_listing ON price_points (source, external_id, at);
+CREATE TABLE IF NOT EXISTS fx_rates (
+    currency TEXT PRIMARY KEY,
+    usd_rate TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sets (
     source TEXT NOT NULL,
@@ -208,6 +221,42 @@ class Store:
             for event in [_event(rest)]
         ]
 
+    def add_price_point(self, listing: Listing, at: datetime) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT INTO price_points (source, external_id, price, currency, at) VALUES (?, ?, ?, ?, ?)",
+                (listing.source, listing.external_id, str(listing.price), listing.currency, at.isoformat()),
+            )
+
+    def price_history(self, source: str, external_id: str) -> list[PricePoint]:
+        rows = self.db.execute(
+            "SELECT price, currency, at FROM price_points WHERE source = ? AND external_id = ? ORDER BY at",
+            (source, external_id),
+        )
+        return [PricePoint(Decimal(p), c, datetime.fromisoformat(at)) for p, c, at in rows]
+
+    def events_of_kind(self, kind: str) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM events WHERE kind = ?", (kind,)).fetchone()[0]
+
+    def save_rate(self, currency: str, usd_rate, fetched_at: datetime) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT INTO fx_rates (currency, usd_rate, fetched_at) VALUES (?, ?, ?)"
+                " ON CONFLICT (currency) DO UPDATE SET usd_rate = excluded.usd_rate, fetched_at = excluded.fetched_at",
+                (currency, str(usd_rate), fetched_at.isoformat()),
+            )
+
+    def rate_fetched_at(self, currency: str) -> datetime | None:
+        row = self.db.execute("SELECT fetched_at FROM fx_rates WHERE currency = ?", (currency,)).fetchone()
+        return datetime.fromisoformat(row[0]) if row else None
+
+    def usd_rate(self, currency: str) -> Decimal | None:
+        """How many USD one unit of `currency` is worth, from the last fetch. None if never fetched."""
+        if currency == "USD":
+            return Decimal("1")
+        row = self.db.execute("SELECT usd_rate FROM fx_rates WHERE currency = ?", (currency,)).fetchone()
+        return Decimal(row[0]) if row else None
+
     def save_sets(self, announcements: list[Announcement], seen_at: datetime,
                   queue_for_digest: list[Announcement]) -> None:
         queued = {a.set_id for a in queue_for_digest}
@@ -269,6 +318,11 @@ class Store:
             (source, since.isoformat()),
         ).fetchall()
         return [(_announcement(r[2:]), r[0], r[1]) for r in rows]
+
+    def last_successful_check(self, source: str) -> datetime | None:
+        row = self.db.execute("SELECT MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 1",
+                              (source,)).fetchone()
+        return datetime.fromisoformat(row[0]) if row[0] else None
 
     def record_check(self, source: str, checked_at: datetime, ok: bool,
                      listing_count: int, error: str | None = None) -> None:
