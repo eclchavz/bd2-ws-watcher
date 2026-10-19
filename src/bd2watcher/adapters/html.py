@@ -1,7 +1,7 @@
 import re
 from collections.abc import Iterator
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
@@ -43,15 +43,26 @@ def parse(source: Source, page_url: str, text: str) -> list[RawListing]:
             continue
         price = node.css_first(sel.price) if sel.price else None
         stock = node.css_first(sel.stock) if sel.stock else None
-        state = stock_state(stock.text(strip=True) if stock else "", source)
+        state = stock_state(text_of(stock), source)
         url = urljoin(page_url, link.attributes["href"])
         found.append(RawListing(
-            external_id=url, title=title.text(strip=True), url=url,
-            price=parse_price(price.text(strip=True)) if price else None,
+            external_id=product_id(url), title=text_of(title), url=url,
+            price=parse_price(text_of(price)) if price else None,
             available={"in_stock": True, "preorder": True, "sold_out": False}.get(state),
-            product_type="", tags=("pre-order",) if state == "preorder" else (),
+            product_type="", tags=(), stock_state=state,
         ))
     return found
+
+
+def text_of(node) -> str:
+    """A node's text with nested markup joined by single spaces, so <b>In</b> <b>stock</b> stays two words."""
+    return " ".join(node.text(separator=" ").split()) if node is not None else ""
+
+
+def product_id(url: str) -> str:
+    """A product's identity: its URL without query, fragment or trailing slash, so tracking params don't churn it."""
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}{parts.path.rstrip('/')}"
 
 
 def stock_state(text: str, source: Source) -> str:
@@ -65,15 +76,19 @@ def stock_state(text: str, source: Source) -> str:
 
 
 def parse_price(text: str) -> Decimal | None:
-    """'$1,014.50' -> 1014.50, '¥5,940' -> 5940, '58,99 €' -> 58.99."""
+    """'$1,014.50' -> 1014.50, '¥5,940' -> 5940, '58,99 €' -> 58.99, '1.014,50 €' -> 1014.50, '€1.234' -> 1234."""
     match = re.search(r"\d[\d.,]*", normalise(text))
     if not match:
         return None
     number = match.group().rstrip(".,")
     if "," in number and "." in number:
-        number = number.replace(",", "")
+        # Whichever separator comes last is the decimal point.
+        thousands = "," if number.rfind(".") > number.rfind(",") else "."
+        number = number.replace(thousands, "").replace(",", ".")
     elif re.fullmatch(r"\d+,\d{2}", number):
         number = number.replace(",", ".")
+    elif re.fullmatch(r"\d{1,3}(\.\d{3})+", number):
+        number = number.replace(".", "")
     else:
         number = number.replace(",", "")
     try:

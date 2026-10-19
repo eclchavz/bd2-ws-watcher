@@ -27,6 +27,9 @@ def discover(config: Config, fetcher, source_names: list[str]) -> None:
 
 def _discover_one(config: Config, fetcher, source: Source) -> None:
     name = source.name
+    if source.adapter == "html":
+        print(f"{name}: configured for the html adapter, so try `bd2watcher check-now {name}`")
+        return
     try:
         meta = fetcher.get_json(f"{source.base_url}/meta.json")
     except RobotsUnavailable:
@@ -39,9 +42,6 @@ def _discover_one(config: Config, fetcher, source: Source) -> None:
         print(f"{name}: not Shopify, or unreachable ({type(e).__name__}: {e}). Use the html adapter (ticket 05).")
         return
 
-    if source.adapter == "html":
-        print(f"{name}: configured for the html adapter, so try `bd2watcher check-now {name}`")
-        return
     print(f"{name}: Shopify ({meta.get('name', '?')}), currency {meta.get('currency', '?')}")
     try:
         collections = _ws_collections(source, fetcher)
@@ -74,7 +74,7 @@ def _ws_collections(source: Source, fetcher) -> list[tuple[str, str]]:
 
 
 def capture_fixture(config: Config, fetcher, name: str, out_dir: Path) -> None:
-    """Save a store's current products.json pages so tests can replay them, replacing any earlier capture."""
+    """Save a store's current pages (products.json, or html) so tests can replay them, replacing any earlier capture."""
     source = config.source(name)
     target = Path(out_dir) / name
     with tempfile.TemporaryDirectory() as tmp:

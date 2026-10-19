@@ -19,6 +19,7 @@ class RawListing:
     available: bool | None
     product_type: str
     tags: tuple[str, ...]
+    stock_state: StockState | None = None  # set when the adapter already knows it (html stock text)
 
 
 @dataclass(frozen=True)

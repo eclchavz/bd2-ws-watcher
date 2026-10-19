@@ -48,8 +48,8 @@ class HtmlSelectors(BaseModel):
     next_page: str | None = None
     max_pages: int = 10
     # Stock text patterns, checked in this order: sold out, then preorder, then in stock.
-    sold_out: list[str] = ["out of stock", "sold out", "unavailable", "not available", "品切れ", "在庫切れ", "売り切れ", "完売"]
-    preorder: list[str] = ["pre-order", "preorder", "予約"]
+    sold_out: list[str] = ["out of stock", "not in stock", "sold out", "unavailable", "not available", "品切れ", "在庫切れ", "売り切れ", "完売"]
+    preorder: list[str] = ["pre-order", "preorder", "backorder", "予約"]
     in_stock: list[str] = ["in stock", "add to cart", "available", "在庫あり", "カートに入れる"]
 
 

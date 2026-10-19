@@ -99,6 +99,6 @@ sources:
   #     product: li.product
   #     title: .woocommerce-loop-product__title
   #     link: a
-  #     price: .price .amount
+  #     price: ".price ins .amount, .price > .amount"   # sale price, not the struck-through one
   #     stock: .stock
   #     next_page: a.next
