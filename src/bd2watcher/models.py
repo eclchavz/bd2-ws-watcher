@@ -7,6 +7,7 @@ StockState = Literal["in_stock", "preorder", "sold_out", "unknown"]
 Kind = Literal["sealed", "supply", "other"]
 EventKind = Literal["new_listing", "restock", "preorder_opened", "price_changed"]
 SetEventKind = Literal["new_set", "english_release"]
+SourceEventKind = Literal["source_broken", "source_recovered"]
 
 
 @dataclass(frozen=True)
@@ -93,3 +94,16 @@ class PricePoint:
     price: Decimal
     currency: str
     at: datetime
+
+
+@dataclass(frozen=True)
+class SourceAlert:
+    """A source stopped working (3 failed checks in a row) or started working again."""
+
+    event: SourceEventKind
+    channel: str
+    source: str
+    source_label: str
+    error: str | None
+    sent_at: datetime
+    ok: bool = True

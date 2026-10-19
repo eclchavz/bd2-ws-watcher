@@ -45,6 +45,7 @@ def create_app(config: Config, store: Store) -> FastAPI:
             enabled = config.enabled_sources
             listings = [l for l in store.listings() if l.source in {s.name for s in enabled}]
             checks = {s.name: store.last_check(s.name) for s in enabled}
+            streaks = {s.name: store.failure_streak(s.name)[0] for s in enabled}
             sets = [a for a in store.sets() if a.source in {s.name for s in enabled}]
             rates = {c: store.usd_rate(c) for c in {l.currency for l in listings}}
 
@@ -72,7 +73,7 @@ def create_app(config: Config, store: Store) -> FastAPI:
             "rows": rows, "labels": labels, "stock_words": STOCK_WORDS, "sets": sets,
             "series_on_sale": {l.series for l in listings},
             "official_minutes": config.intervals.official_minutes,
-            "sources": [(s.name, labels[s.name], checks[s.name]) for s in enabled],
+            "sources": [(s.name, labels[s.name], checks[s.name], streaks[s.name]) for s in enabled],
         })
 
     @app.get("/product", response_class=HTMLResponse)

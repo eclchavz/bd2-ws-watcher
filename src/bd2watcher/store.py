@@ -319,6 +319,30 @@ class Store:
         ).fetchall()
         return [(_announcement(r[2:]), r[0], r[1]) for r in rows]
 
+    def failure_streak(self, source: str) -> tuple[int, datetime | None]:
+        """(failed checks in a row up to now, time of the latest one)."""
+        rows = self.db.execute(
+            "SELECT ok, checked_at FROM source_checks WHERE source = ? ORDER BY id DESC LIMIT 50", (source,)
+        ).fetchall()
+        streak = 0
+        for ok, _ in rows:
+            if ok:
+                break
+            streak += 1
+        return streak, datetime.fromisoformat(rows[0][1]) if streak else None
+
+    def failures_before_last_check(self, source: str) -> int:
+        """Failed checks in a row just before the latest check."""
+        rows = self.db.execute(
+            "SELECT ok FROM source_checks WHERE source = ? ORDER BY id DESC LIMIT 51", (source,)
+        ).fetchall()[1:]
+        streak = 0
+        for (ok,) in rows:
+            if ok:
+                break
+            streak += 1
+        return streak
+
     def last_successful_check(self, source: str) -> datetime | None:
         row = self.db.execute("SELECT MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 1",
                               (source,)).fetchone()

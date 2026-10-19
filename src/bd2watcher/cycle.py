@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from bd2watcher.adapters import html, shopify
+from bd2watcher import health
 from bd2watcher.alerts import deliver
 from bd2watcher.changes import detect
 from bd2watcher.classify import kind_of, product_of, series_of, stock_state_of
@@ -51,7 +52,9 @@ def run_check(source: Source, config: Config, fetcher, store: Store, now: dateti
             raise EmptyResult(f"{source.name} returned no products at all")
         listings = watched(source, config, raws)
     except Exception as e:
-        store.record_check(source.name, now, ok=False, listing_count=0, error=f"{type(e).__name__}: {e}")
+        error = f"{type(e).__name__}: {e}"
+        store.record_check(source.name, now, ok=False, listing_count=0, error=error)
+        health.after_check(source, store, notifiers, now, error)
         raise
     previous = {l.external_id: l for l in store.listings(source.name)}
     baseline = not store.has_successful_check(source.name)
@@ -67,5 +70,6 @@ def run_check(source: Source, config: Config, fetcher, store: Store, now: dateti
             store.add_price_point(l, now)
     store.mark_sold_out(source.name, missing)
     store.record_check(source.name, now, ok=True, listing_count=len(listings))
+    health.after_check(source, store, notifiers, now, None)
     deliver(events, source, config, store, notifiers, now)
     return listings
