@@ -13,6 +13,10 @@ class RobotsDisallowed(Exception):
     pass
 
 
+class RobotsUnavailable(RobotsDisallowed):
+    """robots.txt answered with a server error, so we treat everything as disallowed for now."""
+
+
 class HttpFetcher:
     """Polite HTTP client: identifies itself, honours robots.txt (including on redirects), and times out."""
 
@@ -45,13 +49,14 @@ class HttpFetcher:
             cached = (self.clock(), self._read_robots(origin))
             self.robots[origin] = cached
         if not cached[1].can_fetch(self.user_agent, url):
-            raise RobotsDisallowed(url)
+            raise (RobotsUnavailable if getattr(cached[1], "unavailable", False) else RobotsDisallowed)(url)
 
     def _read_robots(self, origin: str) -> RobotFileParser:
         parser = RobotFileParser()
         response = self.client.get(f"{origin}/robots.txt")
         if response.status_code >= 500:
             parser.disallow_all = True  # RFC 9309: unreachable robots.txt means disallow everything
+            parser.unavailable = True
         elif response.status_code >= 400:
             parser.parse([])  # no robots.txt means everything is allowed
         else:

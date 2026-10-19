@@ -95,8 +95,8 @@ def test_offers_with_unknown_price_sort_after_priced_ones(config, store, now):
     from bd2watcher.models import Listing
     from bd2watcher.web import create_app
 
-    def offer(source, price):
-        return Listing(source, source, "Box", f"https://{source}.example", "Brown Dust 2", "sealed",
+    def offer(name, price):
+        return Listing("tcg-corner", name, "Box", f"https://{name}.example", "Brown Dust 2", "sealed",
                        price, "USD", "in_stock", "Brown Dust 2 Booster Box (JP)")
 
     from decimal import Decimal

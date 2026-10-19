@@ -79,3 +79,11 @@ def test_robots_txt_is_read_again_after_a_day():
     clock[0] += 24 * 3600 + 1
     fetcher.get_json("https://store.example/b.json")
     assert [r.url.path for r in seen] == ["/robots.txt", "/a.json", "/robots.txt", "/b.json"]
+
+
+def test_a_robots_server_error_is_reported_as_unavailable_not_blocked():
+    from bd2watcher.fetcher import RobotsUnavailable
+
+    fetcher = fetcher_with({"https://store.example/robots.txt": lambda: httpx.Response(503)}, [])
+    with pytest.raises(RobotsUnavailable):
+        fetcher.get_json("https://store.example/products.json")

@@ -23,7 +23,7 @@ log = logging.getLogger("bd2watcher")
 
 def check_now(config: Config, fetcher, source_names: list[str]) -> None:
     """Check sources live and print what was found. Saves nothing and sends nothing."""
-    for name in source_names or [s.name for s in config.sources if s.enabled]:
+    for name in source_names or [s.name for s in config.enabled_sources]:
         listings = find_watched(config.source(name), config, fetcher)
         print(f"{name}: {len(listings)} watched listings")
         for l in listings:
@@ -72,7 +72,7 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
         finally:
             store.close()
 
-    for source in (s for s in config.sources if s.enabled):
+    for source in config.enabled_sources:
         scheduler.add_job(
             # jitter is in seconds: minutes * 6 is 10% of the interval.
             check, "interval", args=[source.name], minutes=minutes, jitter=minutes * 6,
@@ -102,7 +102,7 @@ def main() -> None:
     test_parser = commands.add_parser("send-test-alert", parents=[dry_run], help="send a sample alert to one channel")
     test_parser.add_argument("channel", choices=["discord"])
     check_parser = commands.add_parser("check-now", help="check live and print, without saving")
-    check_parser.add_argument("sources", nargs="*", help="source names (default: all)")
+    check_parser.add_argument("sources", nargs="*", help="source names (default: all enabled sources)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")

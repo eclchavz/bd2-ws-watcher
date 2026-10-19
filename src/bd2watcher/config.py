@@ -61,6 +61,10 @@ class Config(BaseModel):
     english_markers: list[str] = []
     sources: list[Source]
 
+    @property
+    def enabled_sources(self) -> list[Source]:
+        return [s for s in self.sources if s.enabled]
+
     def source(self, name: str) -> Source:
         for source in self.sources:
             if source.name == name:

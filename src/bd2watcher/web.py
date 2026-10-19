@@ -30,13 +30,14 @@ def create_app(config: Config, store: Store) -> FastAPI:
     """The read-only dashboard, reading through one long-lived connection."""
     app = FastAPI(title="BD2 Watcher", docs_url=None, redoc_url=None, openapi_url=None)
     labels = {s.name: s.display_name for s in config.sources}
-    enabled = [s for s in config.sources if s.enabled]
+
     lock = threading.Lock()  # requests run on worker threads but share the connection
 
     @app.get("/", response_class=HTMLResponse)
     def overview(request: Request):
         with lock:
-            listings = store.listings()
+            enabled = config.enabled_sources
+            listings = [l for l in store.listings() if l.source in {s.name for s in enabled}]
             checks = {s.name: store.last_check(s.name) for s in enabled}
 
         products = defaultdict(list)

@@ -8,13 +8,13 @@ PAGE_SIZE = 250
 MAX_PAGES = 40
 
 
-def pages(source: Source, fetcher) -> Iterator[tuple[int, dict]]:
+def pages(source: Source, fetcher, max_pages: int = MAX_PAGES) -> Iterator[tuple[int, dict]]:
     """Yield (page number, products.json body) until a page with no new products, which is yielded too.
 
     Stops early if a page only repeats products already seen, which happens when a store ignores `page`.
     """
     seen_ids: set[str] = set()
-    for page in range(1, MAX_PAGES + 1):
+    for page in range(1, max_pages + 1):
         url = f"{source.base_url}{source.products_path}?limit={PAGE_SIZE}&page={page}"
         body = fetcher.get_json(url)
         yield page, body

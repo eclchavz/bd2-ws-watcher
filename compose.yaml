@@ -10,4 +10,5 @@ services:
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro
+      - ./tests/fixtures:/app/tests/fixtures   # where capture-fixture writes
     mem_limit: 700m
