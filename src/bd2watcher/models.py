@@ -32,6 +32,7 @@ class Listing:
     price: Decimal | None
     currency: str
     stock_state: StockState
+    product: str = ""  # the product this listing sells, shared across stores, e.g. "Brown Dust 2 Booster Box (JP)"
 
 
 @dataclass(frozen=True)

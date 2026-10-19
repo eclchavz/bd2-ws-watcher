@@ -23,6 +23,20 @@ kinds:
   supply: ["sleeve", "playmat", "play mat", "deck box", "deck case", "storage box", "スリーブ", "プレイマット", "デッキケース"]
   sealed: ["booster", "box", "case", "trial deck", "starter", "ブースター", "トライアルデッキ", "カートン"]
 
+# Groups the same sealed product across stores. First match wins, so order matters.
+products:
+  - name: Booster Case
+    keywords: ["case", "carton", "カートン", "x12"]
+  - name: Booster Box
+    keywords: ["box", "ボックス"]
+  - name: Trial Deck
+    keywords: ["trial deck", "トライアルデッキ", "starter"]
+  - name: Booster Pack
+    keywords: ["booster pack", "pack", "パック"]
+
+# A title containing any of these is the English edition. Everything else is Japanese.
+english_markers: ["english", "en"]
+
 preorder_markers: ["pre-order", "preorder", "予約"]
 
 sources:

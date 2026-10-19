@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS listings (
     price TEXT,
     currency TEXT NOT NULL,
     stock_state TEXT NOT NULL,
+    product TEXT NOT NULL DEFAULT '',
     first_seen TEXT NOT NULL,
     last_seen TEXT NOT NULL,
     PRIMARY KEY (source, external_id)
@@ -40,7 +41,8 @@ CREATE TABLE IF NOT EXISTS events (
     listing_kind TEXT NOT NULL,
     price TEXT,
     currency TEXT NOT NULL,
-    stock_state TEXT NOT NULL
+    stock_state TEXT NOT NULL,
+    product TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY,
@@ -53,26 +55,39 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 """
 
+# Columns added after a table first shipped: (table, column, definition). Added on startup if missing.
+ADDED_COLUMNS = [
+    ("listings", "product", "TEXT NOT NULL DEFAULT ''"),
+    ("events", "product", "TEXT NOT NULL DEFAULT ''"),
+]
 
 EVENT_COLUMNS = (
     "events.kind, events.at, events.source, events.external_id, events.title, events.url, events.series,"
-    " events.listing_kind, events.price, events.currency, events.stock_state"
+    " events.listing_kind, events.price, events.currency, events.stock_state, events.product"
 )
 
 
 def _event(row) -> Event:
-    kind, at, source, external_id, title, url, series, listing_kind, price, currency, stock_state = row
+    kind, at, source, external_id, title, url, series, listing_kind, price, currency, stock_state, product = row
     listing = Listing(
         source=source, external_id=external_id, title=title, url=url, series=series, kind=listing_kind,
         price=None if price is None else Decimal(price), currency=currency, stock_state=stock_state,
+        product=product,
     )
     return Event(kind, listing, datetime.fromisoformat(at))
 
 
 class Store:
     def __init__(self, path: str):
-        self.db = sqlite3.connect(path)
+        # The dashboard reads on worker threads (behind a lock); every writer opens its own Store.
+        self.db = sqlite3.connect(path, check_same_thread=False, timeout=10)
+        if path != ":memory:":
+            self.db.execute("PRAGMA journal_mode=WAL")  # lets the dashboard read while a check writes
         self.db.executescript(SCHEMA)
+        for table, column, definition in ADDED_COLUMNS:
+            if column not in {row[1] for row in self.db.execute(f"PRAGMA table_info({table})")}:
+                with self.db:
+                    self.db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def close(self) -> None:
         self.db.close()
@@ -83,18 +98,19 @@ class Store:
                 """
                 INSERT INTO listings
                     (source, external_id, title, url, series, kind, price, currency,
-                     stock_state, first_seen, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     stock_state, product, first_seen, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (source, external_id) DO UPDATE SET
                     title = excluded.title, url = excluded.url, series = excluded.series,
                     kind = excluded.kind, price = excluded.price, currency = excluded.currency,
-                    stock_state = excluded.stock_state, last_seen = excluded.last_seen
+                    stock_state = excluded.stock_state, product = excluded.product,
+                    last_seen = excluded.last_seen
                 """,
                 [
                     (
                         l.source, l.external_id, l.title, l.url, l.series, l.kind,
                         None if l.price is None else str(l.price), l.currency,
-                        l.stock_state, seen_at.isoformat(), seen_at.isoformat(),
+                        l.stock_state, l.product, seen_at.isoformat(), seen_at.isoformat(),
                     )
                     for l in listings
                 ],
@@ -116,9 +132,9 @@ class Store:
         with self.db:
             cursor = self.db.execute(
                 "INSERT INTO events (source, external_id, kind, at, title, url, series, listing_kind,"
-                " price, currency, stock_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " price, currency, stock_state, product) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (l.source, l.external_id, event.kind, event.at.isoformat(), l.title, l.url, l.series,
-                 l.kind, None if l.price is None else str(l.price), l.currency, l.stock_state),
+                 l.kind, None if l.price is None else str(l.price), l.currency, l.stock_state, l.product),
             )
         return cursor.lastrowid
 
@@ -181,16 +197,17 @@ class Store:
         return Check(checked_at=datetime.fromisoformat(row[0]), ok=bool(row[1]),
                      listing_count=row[2], error=row[3])
 
-    def listings(self, source: str) -> list[Listing]:
+    def listings(self, source: str | None = None) -> list[Listing]:
+        """Listings of one source, or of every source when none is given."""
         rows = self.db.execute(
-            "SELECT source, external_id, title, url, series, kind, price, currency, stock_state"
-            " FROM listings WHERE source = ? ORDER BY title",
-            (source,),
+            "SELECT source, external_id, title, url, series, kind, price, currency, stock_state, product"
+            " FROM listings WHERE ? IS NULL OR source = ? ORDER BY title",
+            (source, source),
         )
         return [
             Listing(
                 source=r[0], external_id=r[1], title=r[2], url=r[3], series=r[4], kind=r[5],
-                price=None if r[6] is None else Decimal(r[6]), currency=r[7], stock_state=r[8],
+                price=None if r[6] is None else Decimal(r[6]), currency=r[7], stock_state=r[8], product=r[9],
             )
             for r in rows
         ]

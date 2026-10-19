@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BD2 Watcher</title>
+<style>
+  :root { --bg: #f7f7f8; --card: #fff; --text: #1d1d1f; --muted: #6e6e73; --line: #e3e3e6;
+          --ok: #1a7f37; --warn: #9a6700; --bad: #c62828; --link: #0b5cad; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111214; --card: #1b1c1f; --text: #ececf0; --muted: #9a9aa2; --line: #2c2d31;
+            --ok: #4ac26b; --warn: #d4a72c; --bad: #ff6b6b; --link: #6cb6ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 16px; }
+  h2 { font-size: 1.1rem; margin: 28px 0 8px; }
+  nav a { margin-right: 14px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { color: var(--muted); font-weight: 600; font-size: .85rem; }
+  a { color: var(--link); }
+  .offer { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; padding: 2px 0; }
+  .muted { color: var(--muted); font-size: .85rem; }
+  .in_stock, .ok { color: var(--ok); font-weight: 600; }
+  .preorder { color: var(--warn); font-weight: 600; }
+  .sold_out, .unknown { color: var(--muted); }
+  .bad { color: var(--bad); font-weight: 600; }
+</style>
+</head>
+<body><main>
+<h1>BD2 Watcher</h1>
+{% block body %}{% endblock %}
+</main></body>
+</html>

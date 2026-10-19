@@ -4,6 +4,9 @@ import os
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import threading
+
+import uvicorn
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from bd2watcher.config import Config, load_config
@@ -12,6 +15,7 @@ from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
 from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier
 from bd2watcher.store import Store
+from bd2watcher.web import create_app
 
 log = logging.getLogger("bd2watcher")
 
@@ -49,8 +53,11 @@ def send_test_alert(notifiers: list, channel: str) -> None:
     raise SystemExit(f"No notifier for channel {channel!r}")
 
 
-def run(config: Config, db_path: str, notifiers: list) -> None:
-    """Check every source now, then on its interval, until stopped."""
+def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
+    """Check every source now and then on its interval, and serve the dashboard, until stopped.
+
+    The dashboard runs on its own thread, so a dashboard failure (say, port in use) never stops the checks.
+    """
     fetcher = HttpFetcher(config.user_agent)
     scheduler = BlockingScheduler()
     minutes = config.intervals.store_minutes
@@ -70,6 +77,12 @@ def run(config: Config, db_path: str, notifiers: list) -> None:
             check, "interval", args=[source.name], minutes=minutes, jitter=minutes * 6,
             next_run_time=datetime.now(timezone.utc), id=source.name, max_instances=1,
         )
+    app = create_app(config, Store(db_path))
+    threading.Thread(
+        target=uvicorn.run, args=(app,), kwargs={"host": "0.0.0.0", "port": port, "log_level": "warning"},
+        name="dashboard", daemon=True,
+    ).start()
+    log.info("Dashboard on port %d", port)
     scheduler.start()
 
 
@@ -93,7 +106,8 @@ def main() -> None:
     elif args.command == "send-test-alert":
         send_test_alert(build_notifiers(config, args.dry_run), args.channel)
     else:
-        run(config, os.environ.get("BD2_DB", "data/bd2watcher.db"), build_notifiers(config, args.dry_run))
+        run(config, os.environ.get("BD2_DB", "data/bd2watcher.db"), build_notifiers(config, args.dry_run),
+            int(os.environ.get("BD2_PORT", "8080")))
 
 
 if __name__ == "__main__":

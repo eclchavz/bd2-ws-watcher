@@ -31,6 +31,11 @@ class Alerts(BaseModel):
     dry_run: bool = False
 
 
+class ProductRule(BaseModel):
+    name: str
+    keywords: list[str]
+
+
 class Source(BaseModel):
     name: str
     label: str | None = None
@@ -51,6 +56,8 @@ class Config(BaseModel):
     watchlists: list[Watchlist]
     kinds: KindRules
     preorder_markers: list[str] = []
+    products: list[ProductRule] = []
+    english_markers: list[str] = []
     sources: list[Source]
 
     def source(self, name: str) -> Source:

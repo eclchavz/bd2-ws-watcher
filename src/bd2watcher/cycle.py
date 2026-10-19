@@ -3,7 +3,7 @@ from datetime import datetime
 from bd2watcher.adapters import shopify
 from bd2watcher.alerts import deliver
 from bd2watcher.changes import detect
-from bd2watcher.classify import kind_of, series_of, stock_state_of
+from bd2watcher.classify import kind_of, product_of, series_of, stock_state_of
 from bd2watcher.config import Config, Source
 from bd2watcher.models import Listing, RawListing
 from bd2watcher.store import Store
@@ -33,7 +33,7 @@ def watched(source: Source, config: Config, raws: list[RawListing]) -> list[List
             Listing(
                 source=source.name, external_id=raw.external_id, title=raw.title, url=raw.url,
                 series=series, kind=kind, price=raw.price, currency=source.currency,
-                stock_state=stock_state_of(raw, config),
+                stock_state=stock_state_of(raw, config), product=product_of(raw, series, kind, config),
             )
         )
     return found

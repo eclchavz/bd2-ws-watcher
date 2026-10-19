@@ -3,6 +3,10 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    ports:
+      # Reachable from your home network at http://<this-pc-ip>:8080.
+      # Never forward this port on your router: the dashboard has no login (ADR 0001).
+      - "8080:8080"
     volumes:
       - ./data:/app/data
       - ./config:/app/config:ro

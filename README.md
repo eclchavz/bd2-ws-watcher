@@ -16,6 +16,12 @@ docker compose logs -f      # watch the checks
 
 The database lives in `./data/`, so it survives restarts and rebuilds. Sources, keywords and intervals are in `config/config.yaml`. After editing the config, run `docker compose restart`.
 
+## Dashboard
+
+Open http://localhost:8080 on the PC, or `http://<the PC's IP address>:8080` from your phone on the same Wi-Fi. To find the PC's IP on Windows, run `ipconfig` and look for "IPv4 Address".
+
+The dashboard has no login. **Never forward port 8080 on your router or expose it to the internet.** For access away from home, see ticket 11 (Tailscale).
+
 ## Check a source by hand
 
 Checks live and prints what it finds, without saving or alerting:

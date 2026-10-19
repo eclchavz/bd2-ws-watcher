@@ -4,11 +4,11 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done (on branch `ticket/03-dashboard`)
 
-- [ ] A Seam 2 test: a database seeded through a check cycle renders a page that lists each Brown Dust 2 product with every store's price, stock state and link
-- [ ] Listings for the same product from different stores group under one product row
-- [ ] A Seam 2 test: the sources section shows the last check time and OK or broken for each source
-- [ ] Server-rendered templates with no front-end build step
-- [ ] It opens from a phone on the same Wi-Fi at `http://<pc-ip>:<port>`, with that port set in compose
-- [ ] No login. The README warns never to expose the port to the internet (ADR 0001).
+- [x] A Seam 2 test: a database seeded through a check cycle renders a page that lists each Brown Dust 2 product with every store's price, stock state and link
+- [x] Listings for the same product from different stores group under one product row
+- [x] A Seam 2 test: the sources section shows the last check time and OK or broken for each source
+- [x] Server-rendered templates with no front-end build step
+- [x] It opens from a phone on the same Wi-Fi at `http://<pc-ip>:<port>`, with that port set in compose
+- [x] No login. The README warns never to expose the port to the internet (ADR 0001).

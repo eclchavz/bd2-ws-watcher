@@ -92,3 +92,25 @@ def test_a_failed_check_is_recorded_and_still_raised(config, store, now):
         run_check(config.source("tcg-corner"), config, FakeFetcher({}), store, now)
 
     assert store.last_check("tcg-corner").ok is False
+
+
+def test_product_names_match_whole_words_and_spot_english_editions(config, store, now):
+    from conftest import ShopifyStoreFake
+
+    def product(i, title):
+        return {"id": i, "title": title, "handle": f"p{i}", "product_type": "", "tags": [],
+                "variants": [{"id": i, "title": "Default", "price": "10.00", "available": True}]}
+
+    fake = ShopifyStoreFake("https://tcg-corner.com", [
+        product(1, "Brown Dust 2 Booster Box Showcase Edition"),
+        product(2, "Brown Dust 2 Booster Box [EN]"),
+        product(3, "Weiss Schwarz Brown Dust 2 Booster Box English Edition"),
+    ])
+    run_check(config.source("tcg-corner"), config, fake, store, now)
+
+    products = {l.title: l.product for l in store.listings("tcg-corner")}
+    assert products == {
+        "Brown Dust 2 Booster Box Showcase Edition": "Brown Dust 2 Booster Box (JP)",
+        "Brown Dust 2 Booster Box [EN]": "Brown Dust 2 Booster Box (EN)",
+        "Weiss Schwarz Brown Dust 2 Booster Box English Edition": "Brown Dust 2 Booster Box (EN)",
+    }
