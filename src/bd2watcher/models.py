@@ -5,6 +5,7 @@ from typing import Literal
 
 StockState = Literal["in_stock", "preorder", "sold_out", "unknown"]
 Kind = Literal["sealed", "supply", "other"]
+EventKind = Literal["new_listing", "restock", "preorder_opened"]
 
 
 @dataclass(frozen=True)
@@ -39,3 +40,22 @@ class Check:
     ok: bool
     listing_count: int
     error: str | None
+
+
+@dataclass(frozen=True)
+class Event:
+    kind: EventKind
+    listing: Listing
+    at: datetime
+
+
+@dataclass(frozen=True)
+class Alert:
+    """An event delivered (or attempted) through one channel."""
+
+    event: EventKind
+    channel: str
+    listing: Listing
+    store_label: str
+    sent_at: datetime
+    ok: bool = True

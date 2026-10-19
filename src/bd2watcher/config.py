@@ -26,16 +26,27 @@ class KindRules(BaseModel):
     sealed: list[str] = []
 
 
+class Alerts(BaseModel):
+    cooldown_hours: float = 6
+    dry_run: bool = False
+
+
 class Source(BaseModel):
     name: str
+    label: str | None = None
     adapter: Literal["shopify"]
     base_url: str
     products_path: str = "/products.json"
     currency: str
 
+    @property
+    def display_name(self) -> str:
+        return self.label or self.name
+
 
 class Config(BaseModel):
     intervals: Intervals = Intervals()
+    alerts: Alerts = Alerts()
     user_agent: str
     watchlists: list[Watchlist]
     kinds: KindRules

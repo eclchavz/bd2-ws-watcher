@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 from decimal import Decimal
 
-from bd2watcher.models import Check, Listing
+from bd2watcher.models import Alert, Check, Event, Listing
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS source_checks (
@@ -27,7 +27,46 @@ CREATE TABLE IF NOT EXISTS listings (
     last_seen TEXT NOT NULL,
     PRIMARY KEY (source, external_id)
 );
+-- Events keep a copy of the listing as it was, so alert history doesn't change later.
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY,
+    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    at TEXT NOT NULL,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    series TEXT NOT NULL,
+    listing_kind TEXT NOT NULL,
+    price TEXT,
+    currency TEXT NOT NULL,
+    stock_state TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS alerts (
+    id INTEGER PRIMARY KEY,
+    event_id INTEGER NOT NULL REFERENCES events (id),
+    channel TEXT NOT NULL,
+    store_label TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    ok INTEGER NOT NULL,
+    error TEXT
+);
 """
+
+
+EVENT_COLUMNS = (
+    "events.kind, events.at, events.source, events.external_id, events.title, events.url, events.series,"
+    " events.listing_kind, events.price, events.currency, events.stock_state"
+)
+
+
+def _event(row) -> Event:
+    kind, at, source, external_id, title, url, series, listing_kind, price, currency, stock_state = row
+    listing = Listing(
+        source=source, external_id=external_id, title=title, url=url, series=series, kind=listing_kind,
+        price=None if price is None else Decimal(price), currency=currency, stock_state=stock_state,
+    )
+    return Event(kind, listing, datetime.fromisoformat(at))
 
 
 class Store:
@@ -60,6 +99,67 @@ class Store:
                     for l in listings
                 ],
             )
+
+    def mark_sold_out(self, source: str, external_ids: list[str]) -> None:
+        with self.db:
+            self.db.executemany(
+                "UPDATE listings SET stock_state = 'sold_out' WHERE source = ? AND external_id = ?",
+                [(source, i) for i in external_ids],
+            )
+
+    def has_successful_check(self, source: str) -> bool:
+        row = self.db.execute("SELECT 1 FROM source_checks WHERE source = ? AND ok = 1 LIMIT 1", (source,))
+        return row.fetchone() is not None
+
+    def record_event(self, event: Event) -> int:
+        l = event.listing
+        with self.db:
+            cursor = self.db.execute(
+                "INSERT INTO events (source, external_id, kind, at, title, url, series, listing_kind,"
+                " price, currency, stock_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (l.source, l.external_id, event.kind, event.at.isoformat(), l.title, l.url, l.series,
+                 l.kind, None if l.price is None else str(l.price), l.currency, l.stock_state),
+            )
+        return cursor.lastrowid
+
+    def undelivered(self, source: str, since: datetime) -> list[tuple[int, str, Event]]:
+        """Events whose every send to a channel failed, newer than `since`: (event id, channel, event)."""
+        rows = self.db.execute(
+            f"SELECT events.id, alerts.channel, {EVENT_COLUMNS} FROM events"
+            " JOIN alerts ON alerts.event_id = events.id"
+            " WHERE events.source = ? AND events.at >= ?"
+            " GROUP BY events.id, alerts.channel HAVING MAX(alerts.ok) = 0 ORDER BY events.id",
+            (source, since.isoformat()),
+        ).fetchall()
+        return [(r[0], r[1], _event(r[2:])) for r in rows]
+
+    def record_alert(self, event_id: int, alert: Alert, ok: bool, error: str | None = None) -> None:
+        with self.db:
+            self.db.execute(
+                "INSERT INTO alerts (event_id, channel, store_label, sent_at, ok, error) VALUES (?, ?, ?, ?, ?, ?)",
+                (event_id, alert.channel, alert.store_label, alert.sent_at.isoformat(), int(ok), error),
+            )
+
+    def last_alert_at(self, source: str, external_id: str, kind: str | None = None) -> datetime | None:
+        """When this listing last had an alert delivered, optionally only of one event kind."""
+        row = self.db.execute(
+            "SELECT MAX(alerts.sent_at) FROM alerts JOIN events ON events.id = alerts.event_id"
+            " WHERE events.source = ? AND events.external_id = ? AND alerts.ok = 1"
+            " AND (? IS NULL OR events.kind = ?)",
+            (source, external_id, kind, kind),
+        ).fetchone()
+        return None if row[0] is None else datetime.fromisoformat(row[0])
+
+    def alerts(self) -> list[Alert]:
+        rows = self.db.execute(
+            f"SELECT alerts.channel, alerts.store_label, alerts.sent_at, alerts.ok, {EVENT_COLUMNS}"
+            " FROM alerts JOIN events ON events.id = alerts.event_id ORDER BY alerts.id"
+        ).fetchall()
+        return [
+            Alert(event.kind, channel, event.listing, store_label, datetime.fromisoformat(sent_at), bool(ok))
+            for channel, store_label, sent_at, ok, *rest in rows
+            for event in [_event(rest)]
+        ]
 
     def record_check(self, source: str, checked_at: datetime, ok: bool,
                      listing_count: int, error: str | None = None) -> None:
