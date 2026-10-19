@@ -16,6 +16,8 @@ ROUTES = {
     "new_set": WATCHED,           # watched-series sets only; others go to the email digest
     "english_release": WATCHED,
     "price_changed": (),          # shown on the dashboard's price chart, never alerted (ADR 0002)
+    "source_broken": ("discord",),
+    "source_recovered": ("discord",),
 }
 
 

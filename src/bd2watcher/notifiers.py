@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from bd2watcher.models import Alert, Announcement, SetAlert
+from bd2watcher.models import Alert, Announcement, SetAlert, SourceAlert
 
 log = logging.getLogger(__name__)
 
@@ -17,6 +17,8 @@ HEADLINES = {
     "new_set": "📣 ANNOUNCED",
     "english_release": "🇺🇸 ENGLISH RELEASE ANNOUNCED",
     "price_changed": "💲 PRICE CHANGED",  # never routed to a channel, but formattable
+    "source_broken": "⚠️ CHECK BROKEN",
+    "source_recovered": "✅ CHECK RECOVERED",
 }
 STOCK_WORDS = {"in_stock": "in stock", "preorder": "preorder", "sold_out": "sold out", "unknown": "stock unknown"}
 
@@ -34,7 +36,12 @@ def price_text(price: Decimal | None, currency: str, rate: Decimal | None) -> st
     return f"{price} {currency}"
 
 
-def format_alert(alert: Alert | SetAlert) -> str:
+def format_alert(alert: Alert | SetAlert | SourceAlert) -> str:
+    if isinstance(alert, SourceAlert):
+        if alert.event == "source_broken":
+            return (f"**{HEADLINES[alert.event]}** · {alert.source_label}\n"
+                    f"Several checks in a row failed, so alerts from it may be missed. Last error: {alert.error}")
+        return f"**{HEADLINES[alert.event]}** · {alert.source_label}\nChecks are working again."
     if isinstance(alert, SetAlert):
         a = alert.announcement
         release = f"releases {a.release_date.isoformat()}" if a.release_date else "release date not given yet"

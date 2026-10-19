@@ -4,10 +4,10 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** done (on branch `ticket/10-source-health`)
 
-- [ ] A Seam 1 test: 2 failures send nothing, the 3rd sends exactly one `source_broken`, and a 4th sends nothing
-- [ ] A Seam 1 test: a success after being broken sends one `source_recovered`
+- [x] A Seam 1 test: 2 failures send nothing, the 3rd sends exactly one `source_broken`, and a 4th sends nothing
+- [x] A Seam 1 test: a success after being broken sends one `source_recovered`
 - [x] A Seam 1 test: an empty result from a source that previously had listings counts as a failure, and its listings are not marked sold out (done early in ticket 02)
-- [ ] Errors back off exponentially for that host
-- [ ] The dashboard's sources section shows the failure count and the last error message
+- [x] Errors back off exponentially for that host
+- [x] The dashboard's sources section shows the failure count and the last error message

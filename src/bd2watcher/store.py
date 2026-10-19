@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS fx_rates (
     usd_rate TEXT NOT NULL,
     fetched_at TEXT NOT NULL
 );
+-- Sources we've told the user are broken; cleared once "recovered" is sent.
+CREATE TABLE IF NOT EXISTS broken_sources (source TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS sets (
     source TEXT NOT NULL,
     set_id TEXT NOT NULL,
@@ -318,6 +320,25 @@ class Store:
             (source, since.isoformat()),
         ).fetchall()
         return [(_announcement(r[2:]), r[0], r[1]) for r in rows]
+
+    def failure_streak(self, source: str) -> tuple[int, datetime | None]:
+        """(failed checks in a row up to now, time of the latest one)."""
+        count, last = self.db.execute(
+            "SELECT COUNT(*), MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 0"
+            " AND id > COALESCE((SELECT MAX(id) FROM source_checks WHERE source = ? AND ok = 1), 0)",
+            (source, source),
+        ).fetchone()
+        return count, datetime.fromisoformat(last) if last else None
+
+    def is_marked_broken(self, source: str) -> bool:
+        return self.db.execute("SELECT 1 FROM broken_sources WHERE source = ?", (source,)).fetchone() is not None
+
+    def mark_broken(self, source: str, broken: bool) -> None:
+        with self.db:
+            if broken:
+                self.db.execute("INSERT OR IGNORE INTO broken_sources (source) VALUES (?)", (source,))
+            else:
+                self.db.execute("DELETE FROM broken_sources WHERE source = ?", (source,))
 
     def last_successful_check(self, source: str) -> datetime | None:
         row = self.db.execute("SELECT MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 1",

@@ -15,6 +15,7 @@ from bd2watcher.cycle import find_watched, run_check
 from bd2watcher.discover import capture_fixture, discover
 from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
+from bd2watcher import health
 from bd2watcher.digest import run_digest
 from bd2watcher.fx import refresh_rates
 from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier, EmailNotifier, NtfyNotifier
@@ -104,6 +105,9 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
         store = Store(db_path)
         source = config.source(name)
         try:
+            if not health.due(source, config, store, datetime.now(timezone.utc)):
+                log.info("%s: backing off after repeated failures", name)
+                return
             if source.is_official:
                 run_official_check(source, config, fetcher, store, datetime.now(timezone.utc), notifiers)
             else:
@@ -113,7 +117,7 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
             store.close()
 
     for source in config.enabled_sources:
-        every = config.intervals.official_minutes if source.is_official else minutes
+        every = int(health.interval(source, config).total_seconds() // 60)
         scheduler.add_job(
             # jitter is in seconds: minutes * 6 is 10% of the interval.
             check, "interval", args=[source.name], minutes=every, jitter=every * 6,
