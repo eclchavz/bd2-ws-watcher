@@ -4,8 +4,10 @@ import os
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import threading
+
 import uvicorn
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 from bd2watcher.config import Config, load_config
 from bd2watcher.cycle import find_watched, run_check
@@ -52,9 +54,12 @@ def send_test_alert(notifiers: list, channel: str) -> None:
 
 
 def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
-    """Check every source now and then on its interval, and serve the dashboard, until stopped."""
+    """Check every source now and then on its interval, and serve the dashboard, until stopped.
+
+    The dashboard runs on its own thread, so a dashboard failure (say, port in use) never stops the checks.
+    """
     fetcher = HttpFetcher(config.user_agent)
-    scheduler = BackgroundScheduler()
+    scheduler = BlockingScheduler()
     minutes = config.intervals.store_minutes
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
 
@@ -72,11 +77,13 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
             check, "interval", args=[source.name], minutes=minutes, jitter=minutes * 6,
             next_run_time=datetime.now(timezone.utc), id=source.name, max_instances=1,
         )
+    app = create_app(config, Store(db_path))
+    threading.Thread(
+        target=uvicorn.run, args=(app,), kwargs={"host": "0.0.0.0", "port": port, "log_level": "warning"},
+        name="dashboard", daemon=True,
+    ).start()
+    log.info("Dashboard on port %d", port)
     scheduler.start()
-    try:
-        uvicorn.run(create_app(config, lambda: Store(db_path)), host="0.0.0.0", port=port, log_level="warning")
-    finally:
-        scheduler.shutdown()
 
 
 def main() -> None:

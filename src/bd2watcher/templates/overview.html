@@ -30,7 +30,7 @@
   {% for name, label, check in sources %}
   <tr data-source="{{ name }}">
     <td>{{ label }}</td>
-    <td>{% if check %}{{ check.checked_at.astimezone().strftime("%Y-%m-%d %H:%M") }}{% else %}never{% endif %}</td>
+    <td>{% if check %}{{ check.checked_at | local_time }}{% else %}never{% endif %}</td>
     <td>
       {% if not check %}<span class="muted">Waiting</span>
       {% elif check.ok %}<span class="ok">OK</span> <span class="muted">{{ check.listing_count }} watched</span>

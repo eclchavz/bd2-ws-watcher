@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS events (
     listing_kind TEXT NOT NULL,
     price TEXT,
     currency TEXT NOT NULL,
-    stock_state TEXT NOT NULL
+    stock_state TEXT NOT NULL,
+    product TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY,
@@ -54,29 +55,39 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 """
 
+# Columns added after a table first shipped: (table, column, definition). Added on startup if missing.
+ADDED_COLUMNS = [
+    ("listings", "product", "TEXT NOT NULL DEFAULT ''"),
+    ("events", "product", "TEXT NOT NULL DEFAULT ''"),
+]
 
 EVENT_COLUMNS = (
     "events.kind, events.at, events.source, events.external_id, events.title, events.url, events.series,"
-    " events.listing_kind, events.price, events.currency, events.stock_state"
+    " events.listing_kind, events.price, events.currency, events.stock_state, events.product"
 )
 
 
 def _event(row) -> Event:
-    kind, at, source, external_id, title, url, series, listing_kind, price, currency, stock_state = row
+    kind, at, source, external_id, title, url, series, listing_kind, price, currency, stock_state, product = row
     listing = Listing(
         source=source, external_id=external_id, title=title, url=url, series=series, kind=listing_kind,
         price=None if price is None else Decimal(price), currency=currency, stock_state=stock_state,
+        product=product,
     )
     return Event(kind, listing, datetime.fromisoformat(at))
 
 
 class Store:
     def __init__(self, path: str):
-        # The dashboard reads on worker threads; every writer opens its own Store.
+        # The dashboard reads on worker threads (behind a lock); every writer opens its own Store.
         self.db = sqlite3.connect(path, check_same_thread=False, timeout=10)
         if path != ":memory:":
             self.db.execute("PRAGMA journal_mode=WAL")  # lets the dashboard read while a check writes
         self.db.executescript(SCHEMA)
+        for table, column, definition in ADDED_COLUMNS:
+            if column not in {row[1] for row in self.db.execute(f"PRAGMA table_info({table})")}:
+                with self.db:
+                    self.db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     def close(self) -> None:
         self.db.close()
@@ -121,9 +132,9 @@ class Store:
         with self.db:
             cursor = self.db.execute(
                 "INSERT INTO events (source, external_id, kind, at, title, url, series, listing_kind,"
-                " price, currency, stock_state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " price, currency, stock_state, product) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (l.source, l.external_id, event.kind, event.at.isoformat(), l.title, l.url, l.series,
-                 l.kind, None if l.price is None else str(l.price), l.currency, l.stock_state),
+                 l.kind, None if l.price is None else str(l.price), l.currency, l.stock_state, l.product),
             )
         return cursor.lastrowid
 

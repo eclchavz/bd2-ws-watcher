@@ -1,5 +1,9 @@
+import os
+import threading
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -13,25 +17,26 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 STOCK_ORDER = {"in_stock": 0, "preorder": 1, "unknown": 2, "sold_out": 3}
 
 
-def create_app(config: Config, store_factory) -> FastAPI:
-    """The read-only dashboard. `store_factory` is a Store, or a callable returning a fresh one per request."""
+def local_time(moment: datetime) -> str:
+    """Format a time in the configured zone (TZ), labelled, e.g. 2026-10-17 05:00 MST."""
+    zone = ZoneInfo(os.environ.get("TZ") or "UTC")
+    return moment.astimezone(zone).strftime("%Y-%m-%d %H:%M %Z")
+
+
+templates.env.filters["local_time"] = local_time
+
+
+def create_app(config: Config, store: Store) -> FastAPI:
+    """The read-only dashboard, reading through one long-lived connection."""
     app = FastAPI(title="BD2 Watcher", docs_url=None, redoc_url=None, openapi_url=None)
     labels = {s.name: s.display_name for s in config.sources}
-
-    def open_store() -> tuple[Store, bool]:
-        if isinstance(store_factory, Store):
-            return store_factory, False
-        return store_factory(), True
+    lock = threading.Lock()  # requests run on worker threads but share the connection
 
     @app.get("/", response_class=HTMLResponse)
     def overview(request: Request):
-        store, owned = open_store()
-        try:
+        with lock:
             listings = store.listings()
             checks = {s.name: store.last_check(s.name) for s in config.sources}
-        finally:
-            if owned:
-                store.close()
 
         products = defaultdict(list)
         for l in listings:
@@ -39,9 +44,11 @@ def create_app(config: Config, store_factory) -> FastAPI:
         rows = [
             {
                 "series": series, "kind": kind, "product": product,
-                "offers": sorted(offers, key=lambda o: (STOCK_ORDER[o.stock_state], o.price or 0)),
+                "offers": sorted(offers, key=lambda o: (STOCK_ORDER[o.stock_state], o.price is None, o.price or 0)),
             }
-            for (series, kind, product), offers in sorted(products.items(), key=lambda kv: (kv[0][0], kv[0][1] != "sealed", kv[0][2]))
+            for (series, kind, product), offers in sorted(
+                products.items(), key=lambda kv: (kv[0][0], kv[0][1] != "sealed", kv[0][2])
+            )
         ]
         return templates.TemplateResponse(request, "overview.html", {
             "rows": rows, "labels": labels, "stock_words": STOCK_WORDS,

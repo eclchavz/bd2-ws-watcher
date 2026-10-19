@@ -35,7 +35,7 @@ products:
     keywords: ["booster pack", "pack", "パック"]
 
 # A title containing any of these is the English edition. Everything else is Japanese.
-english_markers: ["english", "(en)", " en "]
+english_markers: ["english", "en"]
 
 preorder_markers: ["pre-order", "preorder", "予約"]
 

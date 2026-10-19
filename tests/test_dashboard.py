@@ -59,3 +59,47 @@ def test_sources_section_shows_last_check_and_health(config, store, two_stores, 
 
 def test_dashboard_is_read_only(two_stores):
     assert two_stores.post("/").status_code == 405
+
+
+def test_a_database_from_before_the_dashboard_is_upgraded_in_place(config, tcg_corner, now, tmp_path):
+    import sqlite3
+
+    from bd2watcher.store import Store
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript("""
+        CREATE TABLE listings (source TEXT NOT NULL, external_id TEXT NOT NULL, title TEXT NOT NULL,
+            url TEXT NOT NULL, series TEXT NOT NULL, kind TEXT NOT NULL, price TEXT, currency TEXT NOT NULL,
+            stock_state TEXT NOT NULL, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL,
+            PRIMARY KEY (source, external_id));
+        CREATE TABLE events (id INTEGER PRIMARY KEY, source TEXT NOT NULL, external_id TEXT NOT NULL,
+            kind TEXT NOT NULL, at TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, series TEXT NOT NULL,
+            listing_kind TEXT NOT NULL, price TEXT, currency TEXT NOT NULL, stock_state TEXT NOT NULL);
+    """)
+    old.close()
+
+    store = Store(str(path))
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now, [])
+    assert "Brown Dust 2 Booster Box (JP)" in {l.product for l in store.listings()}
+
+
+def test_last_check_time_is_shown_in_the_configured_time_zone(two_stores, monkeypatch):
+    monkeypatch.setenv("TZ", "America/Phoenix")
+    page = two_stores.get("/").text
+    tcg = page.split('data-source="tcg-corner"', 1)[1].split("</tr>", 1)[0]
+    assert "2026-10-17 05:00 MST" in tcg
+
+
+def test_offers_with_unknown_price_sort_after_priced_ones(config, store, now):
+    from bd2watcher.models import Listing
+    from bd2watcher.web import create_app
+
+    def offer(source, price):
+        return Listing(source, source, "Box", f"https://{source}.example", "Brown Dust 2", "sealed",
+                       price, "USD", "in_stock", "Brown Dust 2 Booster Box (JP)")
+
+    from decimal import Decimal
+    store.save_listings([offer("a-unknown", None), offer("b-priced", Decimal("50"))], now)
+    page = TestClient(create_app(config, store)).get("/").text
+    assert page.index("b-priced.example") < page.index("a-unknown.example")
