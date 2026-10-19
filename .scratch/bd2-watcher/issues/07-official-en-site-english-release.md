@@ -4,9 +4,9 @@
 
 **Blocked by:** 06
 
-**Status:** ready-for-agent
+**Status:** done (on branch `ticket/06-07-official-sites`), except the live page-structure check: the build sandbox can't reach ws-tcg.com, so fixtures are hand-made around the known URL shape `/products/brd_bp/`.
 
 - [ ] The page structure (or RSS feed) is confirmed live with `check-now official-en`, and a fixture is captured
-- [ ] A Seam 1 test: an English Brown Dust 2 announcement sends one `english_release` alert, labelled as English
-- [ ] A Seam 1 test: other new English sets are queued for the digest
-- [ ] The dashboard shows the JP and EN versions of a set side by side, or labelled by language
+- [x] A Seam 1 test: an English Brown Dust 2 announcement sends one `english_release` alert, labelled as English
+- [x] A Seam 1 test: other new English sets are queued for the digest
+- [x] The dashboard shows the JP and EN versions of a set side by side, or labelled by language

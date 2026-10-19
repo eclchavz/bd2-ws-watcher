@@ -2,7 +2,9 @@ import sqlite3
 from datetime import datetime
 from decimal import Decimal
 
-from bd2watcher.models import Alert, Check, Event, Listing
+from datetime import date
+
+from bd2watcher.models import Alert, Announcement, Check, Event, Listing, SetAlert
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS source_checks (
@@ -44,6 +46,28 @@ CREATE TABLE IF NOT EXISTS events (
     stock_state TEXT NOT NULL,
     product TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS sets (
+    source TEXT NOT NULL,
+    set_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    language TEXT NOT NULL,
+    url TEXT NOT NULL,
+    series TEXT NOT NULL,
+    release_date TEXT,
+    first_seen TEXT NOT NULL,
+    in_digest_queue INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (source, set_id)
+);
+CREATE TABLE IF NOT EXISTS set_alerts (
+    id INTEGER PRIMARY KEY,
+    source TEXT NOT NULL,
+    set_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    ok INTEGER NOT NULL,
+    error TEXT
+);
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY,
     event_id INTEGER NOT NULL REFERENCES events (id),
@@ -75,6 +99,15 @@ def _event(row) -> Event:
         product=product,
     )
     return Event(kind, listing, datetime.fromisoformat(at))
+
+
+SET_COLUMNS = "sets.source, sets.set_id, sets.title, sets.language, sets.url, sets.series, sets.release_date"
+
+
+def _announcement(row) -> Announcement:
+    source, set_id, title, language, url, series, release_date = row
+    return Announcement(source, set_id, title, language, url, series,
+                        date.fromisoformat(release_date) if release_date else None)
 
 
 class Store:
@@ -176,6 +209,64 @@ class Store:
             for channel, store_label, sent_at, ok, *rest in rows
             for event in [_event(rest)]
         ]
+
+    def save_sets(self, announcements: list[Announcement], seen_at: datetime,
+                  queue_for_digest: list[Announcement]) -> None:
+        queued = {a.set_id for a in queue_for_digest}
+        with self.db:
+            self.db.executemany(
+                """
+                INSERT INTO sets (source, set_id, title, language, url, series, release_date, first_seen,
+                                  in_digest_queue)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (source, set_id) DO UPDATE SET
+                    title = excluded.title, url = excluded.url, series = excluded.series,
+                    release_date = COALESCE(excluded.release_date, sets.release_date)
+                """,
+                [
+                    (a.source, a.set_id, a.title, a.language, a.url, a.series,
+                     a.release_date.isoformat() if a.release_date else None, seen_at.isoformat(),
+                     int(a.set_id in queued))
+                    for a in announcements
+                ],
+            )
+
+    def sets(self, source: str | None = None) -> list[Announcement]:
+        rows = self.db.execute(
+            f"SELECT {SET_COLUMNS} FROM sets WHERE ? IS NULL OR source = ?"
+            " ORDER BY release_date IS NULL, release_date DESC, title",
+            (source, source),
+        )
+        return [_announcement(r) for r in rows]
+
+    def digest_queue(self) -> list[Announcement]:
+        rows = self.db.execute(f"SELECT {SET_COLUMNS} FROM sets WHERE in_digest_queue = 1 ORDER BY first_seen, title")
+        return [_announcement(r) for r in rows]
+
+    def clear_digest_queue(self, announcements: list[Announcement]) -> None:
+        with self.db:
+            self.db.executemany("UPDATE sets SET in_digest_queue = 0 WHERE source = ? AND set_id = ?",
+                                [(a.source, a.set_id) for a in announcements])
+
+    def record_set_alert(self, alert: SetAlert, ok: bool, error: str | None = None) -> None:
+        a = alert.announcement
+        with self.db:
+            self.db.execute(
+                "INSERT INTO set_alerts (source, set_id, kind, channel, sent_at, ok, error) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (a.source, a.set_id, alert.event, alert.channel, alert.sent_at.isoformat(), int(ok), error),
+            )
+
+    def undelivered_set_alerts(self, source: str, since: datetime) -> list[tuple[Announcement, str, str]]:
+        """(announcement, event kind, channel) for set alerts that only ever failed, newer than `since`."""
+        rows = self.db.execute(
+            f"SELECT set_alerts.kind, set_alerts.channel, {SET_COLUMNS} FROM set_alerts"
+            " JOIN sets ON sets.source = set_alerts.source AND sets.set_id = set_alerts.set_id"
+            " WHERE set_alerts.source = ? AND set_alerts.sent_at >= ?"
+            " GROUP BY set_alerts.source, set_alerts.set_id, set_alerts.kind, set_alerts.channel"
+            " HAVING MAX(set_alerts.ok) = 0",
+            (source, since.isoformat()),
+        ).fetchall()
+        return [(_announcement(r[2:]), r[0], r[1]) for r in rows]
 
     def record_check(self, source: str, checked_at: datetime, ok: bool,
                      listing_count: int, error: str | None = None) -> None:

@@ -1,0 +1,1 @@
+Hand-made pages for the official-site tests. The real en.ws-tcg.com couldn't be reached from the build environment; only the product URL shape (`/products/brd_bp/`) is known, from press coverage. Replace these with `bd2watcher capture-fixture official-en`.

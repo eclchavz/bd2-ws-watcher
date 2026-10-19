@@ -27,8 +27,8 @@ def discover(config: Config, fetcher, source_names: list[str]) -> None:
 
 def _discover_one(config: Config, fetcher, source: Source) -> None:
     name = source.name
-    if source.adapter == "html":
-        print(f"{name}: configured for the html adapter, so try `bd2watcher check-now {name}`")
+    if source.adapter in ("html", "official"):
+        print(f"{name}: configured for the {source.adapter} adapter, so try `bd2watcher check-now {name}`")
         return
     try:
         meta = fetcher.get_json(f"{source.base_url}/meta.json")
@@ -78,7 +78,11 @@ def capture_fixture(config: Config, fetcher, name: str, out_dir: Path) -> None:
     source = config.source(name)
     target = Path(out_dir) / name
     with tempfile.TemporaryDirectory() as tmp:
-        if source.adapter == "html":
+        if source.is_official:
+            from urllib.parse import urljoin
+            (Path(tmp) / "products.html").write_text(
+                fetcher.get_text(urljoin(source.base_url, source.official.list_path)), encoding="utf-8")
+        elif source.adapter == "html":
             for page, _, text in html.pages(source, fetcher):
                 (Path(tmp) / f"page-{page}.html").write_text(text, encoding="utf-8")
         else:
@@ -86,7 +90,7 @@ def capture_fixture(config: Config, fetcher, name: str, out_dir: Path) -> None:
                 (Path(tmp) / f"products-page-{page}.json").write_text(
                     json.dumps(body, ensure_ascii=False, indent=2), encoding="utf-8")
         target.mkdir(parents=True, exist_ok=True)
-        for old in [*target.glob("products-page-*.json"), *target.glob("page-*.html")]:
+        for old in [*target.glob("products-page-*.json"), *target.glob("page-*.html"), *target.glob("products.html")]:
             old.unlink()
         for new in sorted(Path(tmp).iterdir()):
             shutil.copy(new, target / new.name)

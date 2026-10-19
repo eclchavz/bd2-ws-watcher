@@ -15,6 +15,7 @@ from bd2watcher.discover import capture_fixture, discover
 from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
 from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier
+from bd2watcher.official import fetch as fetch_official, run_official_check
 from bd2watcher.store import Store
 from bd2watcher.web import create_app
 
@@ -24,6 +25,12 @@ log = logging.getLogger("bd2watcher")
 def check_now(config: Config, fetcher, source_names: list[str]) -> None:
     """Check sources live and print what was found. Saves nothing and sends nothing."""
     for name in source_names or [s.name for s in config.enabled_sources]:
+        if config.source(name).is_official:
+            announcements = fetch_official(config.source(name), config, fetcher)
+            print(f"{name}: {len(announcements)} products listed")
+            for a in announcements:
+                print(f"  [{a.series or '-'}] {a.title} | {a.release_date or 'no date'} | {a.url}")
+            continue
         listings = find_watched(config.source(name), config, fetcher)
         print(f"{name}: {len(listings)} watched listings")
         for l in listings:
@@ -66,16 +73,21 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
 
     def check(name: str) -> None:
         store = Store(db_path)
+        source = config.source(name)
         try:
-            listings = run_check(config.source(name), config, fetcher, store, datetime.now(timezone.utc), notifiers)
-            log.info("%s: %d watched listings", name, len(listings))
+            if source.is_official:
+                run_official_check(source, config, fetcher, store, datetime.now(timezone.utc), notifiers)
+            else:
+                listings = run_check(source, config, fetcher, store, datetime.now(timezone.utc), notifiers)
+                log.info("%s: %d watched listings", name, len(listings))
         finally:
             store.close()
 
     for source in config.enabled_sources:
+        every = config.intervals.official_minutes if source.is_official else minutes
         scheduler.add_job(
             # jitter is in seconds: minutes * 6 is 10% of the interval.
-            check, "interval", args=[source.name], minutes=minutes, jitter=minutes * 6,
+            check, "interval", args=[source.name], minutes=every, jitter=every * 6,
             next_run_time=datetime.now(timezone.utc), id=source.name, max_instances=1,
         )
     app = create_app(config, Store(db_path))

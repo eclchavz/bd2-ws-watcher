@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
 StockState = Literal["in_stock", "preorder", "sold_out", "unknown"]
 Kind = Literal["sealed", "supply", "other"]
 EventKind = Literal["new_listing", "restock", "preorder_opened"]
+SetEventKind = Literal["new_set", "english_release"]
 
 
 @dataclass(frozen=True)
@@ -59,5 +60,28 @@ class Alert:
     channel: str
     listing: Listing
     store_label: str
+    sent_at: datetime
+    ok: bool = True
+
+
+@dataclass(frozen=True)
+class Announcement:
+    """A set or product announced on an official Weiss Schwarz site."""
+
+    source: str
+    set_id: str
+    title: str
+    language: str
+    url: str
+    series: str  # the watched series it belongs to, or "" for any other series
+    release_date: date | None = None
+
+
+@dataclass(frozen=True)
+class SetAlert:
+    event: SetEventKind
+    channel: str
+    announcement: Announcement
+    source_label: str
     sent_at: datetime
     ok: bool = True

@@ -23,6 +23,23 @@
 </table>
 </section>
 
+<h2 id="sets">Weiss Schwarz sets</h2>
+<section>
+<table>
+  <tr><th>Set</th><th>Release</th><th></th></tr>
+  {% for s in sets %}
+  <tr data-set="{{ s.source }}/{{ s.set_id }}">
+    <td><a href="{{ s.url }}" rel="noreferrer" target="_blank">{{ s.title }}</a>
+      <div class="muted">{{ s.language }}{% if s.series %} · {{ s.series }}{% endif %}</div></td>
+    <td>{{ s.release_date.isoformat() if s.release_date else "TBA" }}</td>
+    <td>{% if s.series and s.series in series_on_sale %}<a href="#watched">store listings</a>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="3" class="muted">No sets yet. Official sites are checked hourly.</td></tr>
+  {% endfor %}
+</table>
+</section>
+
 <h2 id="sources">Sources</h2>
 <section>
 <table>

@@ -2,7 +2,7 @@ import logging
 
 import httpx
 
-from bd2watcher.models import Alert
+from bd2watcher.models import Alert, SetAlert
 
 log = logging.getLogger(__name__)
 
@@ -10,11 +10,17 @@ HEADLINES = {
     "new_listing": "🆕 NEW",
     "restock": "🟢 IN STOCK",
     "preorder_opened": "📦 PREORDER OPEN",
+    "new_set": "📣 ANNOUNCED",
+    "english_release": "🇺🇸 ENGLISH RELEASE ANNOUNCED",
 }
 STOCK_WORDS = {"in_stock": "in stock", "preorder": "preorder", "sold_out": "sold out", "unknown": "stock unknown"}
 
 
-def format_alert(alert: Alert) -> str:
+def format_alert(alert: Alert | SetAlert) -> str:
+    if isinstance(alert, SetAlert):
+        a = alert.announcement
+        release = f"releases {a.release_date.isoformat()}" if a.release_date else "release date not given yet"
+        return f"**{HEADLINES[alert.event]}** · {a.title}\n{alert.source_label} · {release}\n{a.url}"
     l = alert.listing
     price = "price unknown" if l.price is None else f"{l.price} {l.currency}"
     return (
