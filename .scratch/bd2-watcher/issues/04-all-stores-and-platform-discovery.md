@@ -4,10 +4,12 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-human (needs a run from the user's PC to reach the sites, then agent work)
+**Status:** code done (on branch `ticket/04-all-stores`). Waiting on a `discover` run from the user's PC: the build sandbox can't reach any store.
 
-- [ ] `discover` prints platform, robots.txt status and a suggested path for every configured store
-- [ ] `capture-fixture <source>` writes a fixture that a Seam 1 test can replay
+All six stores are in config. TCG Corner is enabled; the other five are disabled until discover confirms them.
+
+- [x] `discover` prints platform, robots.txt status and a suggested path for every configured store
+- [x] `capture-fixture <source>` writes a fixture that a Seam 1 test can replay
 - [ ] Every Shopify store is configured and has a fixture-backed Seam 1 test showing its Brown Dust 2 listings are found
 - [ ] The platform of Lumius and Hammer Girl is recorded in the spec's Further Notes
 - [ ] Any non-Shopify store is listed in ticket 05, or ticket 05 is closed as not needed

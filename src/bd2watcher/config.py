@@ -43,6 +43,7 @@ class Source(BaseModel):
     base_url: str
     products_path: str = "/products.json"
     currency: str
+    enabled: bool = True
 
     @property
     def display_name(self) -> str:

@@ -11,6 +11,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from bd2watcher.config import Config, load_config
 from bd2watcher.cycle import find_watched, run_check
+from bd2watcher.discover import capture_fixture, discover
 from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
 from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier
@@ -22,7 +23,7 @@ log = logging.getLogger("bd2watcher")
 
 def check_now(config: Config, fetcher, source_names: list[str]) -> None:
     """Check sources live and print what was found. Saves nothing and sends nothing."""
-    for name in source_names or [s.name for s in config.sources]:
+    for name in source_names or [s.name for s in config.sources if s.enabled]:
         listings = find_watched(config.source(name), config, fetcher)
         print(f"{name}: {len(listings)} watched listings")
         for l in listings:
@@ -71,7 +72,7 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
         finally:
             store.close()
 
-    for source in config.sources:
+    for source in (s for s in config.sources if s.enabled):
         scheduler.add_job(
             # jitter is in seconds: minutes * 6 is 10% of the interval.
             check, "interval", args=[source.name], minutes=minutes, jitter=minutes * 6,
@@ -93,6 +94,11 @@ def main() -> None:
     dry_run = argparse.ArgumentParser(add_help=False)
     dry_run.add_argument("--dry-run", action="store_true", help="log alerts instead of sending them")
     commands.add_parser("run", parents=[dry_run], help="check on a schedule until stopped")
+    discover_parser = commands.add_parser("discover", help="report each store's platform, currency and collections")
+    discover_parser.add_argument("sources", nargs="*", help="source names (default: all, including disabled)")
+    capture_parser = commands.add_parser("capture-fixture", help="save a store's products.json pages for tests")
+    capture_parser.add_argument("source")
+    capture_parser.add_argument("--out", default="tests/fixtures")
     test_parser = commands.add_parser("send-test-alert", parents=[dry_run], help="send a sample alert to one channel")
     test_parser.add_argument("channel", choices=["discord"])
     check_parser = commands.add_parser("check-now", help="check live and print, without saving")
@@ -103,6 +109,10 @@ def main() -> None:
     config = load_config(args.config)
     if args.command == "check-now":
         check_now(config, HttpFetcher(config.user_agent), args.sources)
+    elif args.command == "discover":
+        discover(config, HttpFetcher(config.user_agent), args.sources)
+    elif args.command == "capture-fixture":
+        capture_fixture(config, HttpFetcher(config.user_agent), args.source, args.out)
     elif args.command == "send-test-alert":
         send_test_alert(build_notifiers(config, args.dry_run), args.channel)
     else:

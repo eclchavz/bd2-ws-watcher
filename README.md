@@ -30,6 +30,22 @@ Checks live and prints what it finds, without saving or alerting:
 docker compose run --rm bd2watcher bd2watcher check-now tcg-corner
 ```
 
+## Add or enable a store
+
+Stores live in `config/config.yaml`. Only TCG Corner is enabled to begin with. The others stay disabled until checked from a machine that can reach them:
+
+```sh
+docker compose run --rm bd2watcher bd2watcher discover
+```
+
+For each store this prints whether it's Shopify, its currency, any Weiss Schwarz collections (with the `products_path` to use) and how many Brown Dust 2 listings it found. Then, for each store:
+
+1. Set `currency` and `products_path` from the output, and remove `enabled: false`.
+2. Check it: `bd2watcher check-now <name>`.
+3. Save a test fixture: `bd2watcher capture-fixture <name>`. Commit `tests/fixtures/<name>/`.
+
+A store that `discover` reports as not Shopify needs the `html` adapter (ticket 05).
+
 ## Develop
 
 ```sh
