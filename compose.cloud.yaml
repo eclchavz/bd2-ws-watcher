@@ -1,0 +1,7 @@
+# Cloud override: docker compose -f compose.yaml -f compose.cloud.yaml up -d --build
+# The dashboard is bound to the server's loopback only. `tailscale serve` (see docs/deploy-cloud.md)
+# publishes it to your own Tailscale devices; nothing is reachable from the public internet.
+services:
+  bd2watcher:
+    ports: !override
+      - "127.0.0.1:8080:8080"

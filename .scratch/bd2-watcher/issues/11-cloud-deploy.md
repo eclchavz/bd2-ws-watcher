@@ -4,10 +4,12 @@
 
 **Blocked by:** 02, 03, 08
 
-**Status:** ready-for-human (needs the user's Google Cloud and Tailscale accounts)
+**Status:** guide and override done (on branch `ticket/11-cloud-deploy`). Waiting on the user to create the server, since it needs their Google Cloud and Tailscale accounts.
 
-- [ ] The container's memory stays under about 700 MB during a full check cycle (measured and noted)
-- [ ] The guide covers creating the e2-micro within free-tier limits, installing Docker and Tailscale, copying `.env` and the database, and starting the app
-- [ ] The dashboard port is bound to the Tailscale interface only, and a check from outside the tailnet confirms it's unreachable
+The dashboard is bound to loopback and published with `tailscale serve` instead of being bound to the Tailscale IP, which would race with Tailscale at boot.
+
+- [x] The container's memory stays under about 700 MB during a full check cycle (measured: about 50 MB)
+- [x] The guide covers creating the e2-micro within free-tier limits, installing Docker and Tailscale, copying `.env` and the database, and starting the app
+- [ ] The dashboard is bound to the server's loopback only (`ss -tlnp` shows `127.0.0.1:8080`), is published to the tailnet with `tailscale serve`, and a check from outside the tailnet confirms it's unreachable (needs the user's server)
 - [ ] The container restarts automatically after a reboot
-- [ ] The guide includes a short Hetzner section as the fallback
+- [x] The guide includes a short Hetzner section as the fallback
