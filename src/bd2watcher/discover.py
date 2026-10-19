@@ -3,7 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from bd2watcher.adapters import shopify
+from bd2watcher.adapters import html, shopify
 from bd2watcher.classify import normalise
 from bd2watcher.config import Config, Source
 from bd2watcher.cycle import watched
@@ -39,6 +39,9 @@ def _discover_one(config: Config, fetcher, source: Source) -> None:
         print(f"{name}: not Shopify, or unreachable ({type(e).__name__}: {e}). Use the html adapter (ticket 05).")
         return
 
+    if source.adapter == "html":
+        print(f"{name}: configured for the html adapter, so try `bd2watcher check-now {name}`")
+        return
     print(f"{name}: Shopify ({meta.get('name', '?')}), currency {meta.get('currency', '?')}")
     try:
         collections = _ws_collections(source, fetcher)
@@ -75,11 +78,15 @@ def capture_fixture(config: Config, fetcher, name: str, out_dir: Path) -> None:
     source = config.source(name)
     target = Path(out_dir) / name
     with tempfile.TemporaryDirectory() as tmp:
-        for page, body in shopify.pages(source, fetcher):
-            (Path(tmp) / f"products-page-{page}.json").write_text(
-                json.dumps(body, ensure_ascii=False, indent=2), encoding="utf-8")
+        if source.adapter == "html":
+            for page, _, text in html.pages(source, fetcher):
+                (Path(tmp) / f"page-{page}.html").write_text(text, encoding="utf-8")
+        else:
+            for page, body in shopify.pages(source, fetcher):
+                (Path(tmp) / f"products-page-{page}.json").write_text(
+                    json.dumps(body, ensure_ascii=False, indent=2), encoding="utf-8")
         target.mkdir(parents=True, exist_ok=True)
-        for old in target.glob("products-page-*.json"):
+        for old in [*target.glob("products-page-*.json"), *target.glob("page-*.html")]:
             old.unlink()
         for new in sorted(Path(tmp).iterdir()):
             shutil.copy(new, target / new.name)

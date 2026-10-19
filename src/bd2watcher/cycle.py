@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from bd2watcher.adapters import shopify
+from bd2watcher.adapters import html, shopify
 from bd2watcher.alerts import deliver
 from bd2watcher.changes import detect
 from bd2watcher.classify import kind_of, product_of, series_of, stock_state_of
@@ -8,7 +8,7 @@ from bd2watcher.config import Config, Source
 from bd2watcher.models import Listing, RawListing
 from bd2watcher.store import Store
 
-ADAPTERS = {"shopify": shopify.fetch}
+ADAPTERS = {"shopify": shopify.fetch, "html": html.fetch}
 
 
 class EmptyResult(Exception):

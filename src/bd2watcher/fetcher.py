@@ -32,12 +32,18 @@ class HttpFetcher:
         self.robots: dict[str, tuple[float, RobotFileParser]] = {}
 
     def get_json(self, url: str):
+        return self._get(url).json()
+
+    def get_text(self, url: str) -> str:
+        return self._get(url).text
+
+    def _get(self, url: str) -> httpx.Response:
         for _ in range(MAX_REDIRECTS + 1):
             self._check_robots(url)
             response = self.client.get(url)
             if not response.is_redirect:
                 response.raise_for_status()
-                return response.json()
+                return response
             url = urljoin(url, response.headers["location"])
         raise httpx.TooManyRedirects(f"More than {MAX_REDIRECTS} redirects", request=response.request)
 
