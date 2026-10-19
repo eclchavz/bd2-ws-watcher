@@ -106,6 +106,7 @@ class Source(BaseModel):
 
 class Config(BaseModel):
     intervals: Intervals = Intervals()
+    fx_url: str = "https://api.frankfurter.dev/v1/latest?base={currency}&symbols=USD"  # free, no key (ECB rates)
     alerts: Alerts = Alerts()
     user_agent: str
     watchlists: list[Watchlist]

@@ -5,7 +5,7 @@ from typing import Literal
 
 StockState = Literal["in_stock", "preorder", "sold_out", "unknown"]
 Kind = Literal["sealed", "supply", "other"]
-EventKind = Literal["new_listing", "restock", "preorder_opened"]
+EventKind = Literal["new_listing", "restock", "preorder_opened", "price_changed"]
 SetEventKind = Literal["new_set", "english_release"]
 
 
@@ -62,6 +62,7 @@ class Alert:
     store_label: str
     sent_at: datetime
     ok: bool = True
+    usd_rate: Decimal | None = None  # for showing an approximate USD price next to other currencies
 
 
 @dataclass(frozen=True)
@@ -85,3 +86,10 @@ class SetAlert:
     source_label: str
     sent_at: datetime
     ok: bool = True
+
+
+@dataclass(frozen=True)
+class PricePoint:
+    price: Decimal
+    currency: str
+    at: datetime
