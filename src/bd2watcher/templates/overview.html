@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block body %}
+<h2 id="watched">Brown Dust 2</h2>
+<section>
+<table>
+  <tr><th>Product</th><th>Stores</th></tr>
+  {% for row in rows %}
+  <tr data-product="{{ row.product }}">
+    <td>{{ row.product }}<div class="muted">{{ row.kind }}</div></td>
+    <td>
+      {% for o in row.offers %}
+      <div class="offer">
+        <a href="{{ o.url }}" rel="noreferrer" target="_blank">{{ labels.get(o.source, o.source) }}</a>
+        <span>{% if o.price is not none %}{{ o.price }} {{ o.currency }}{% else %}price unknown{% endif %}</span>
+        <span class="{{ o.stock_state }}">{{ stock_words[o.stock_state] }}</span>
+      </div>
+      {% endfor %}
+    </td>
+  </tr>
+  {% else %}
+  <tr><td colspan="2" class="muted">Nothing found yet. The first check runs at startup.</td></tr>
+  {% endfor %}
+</table>
+</section>
+
+<h2 id="sources">Sources</h2>
+<section>
+<table>
+  <tr><th>Source</th><th>Last check</th><th>Status</th></tr>
+  {% for name, label, check in sources %}
+  <tr data-source="{{ name }}">
+    <td>{{ label }}</td>
+    <td>{% if check %}{{ check.checked_at.astimezone().strftime("%Y-%m-%d %H:%M") }}{% else %}never{% endif %}</td>
+    <td>
+      {% if not check %}<span class="muted">Waiting</span>
+      {% elif check.ok %}<span class="ok">OK</span> <span class="muted">{{ check.listing_count }} watched</span>
+      {% else %}<span class="bad">Failing</span><div class="muted">{{ check.error }}</div>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+</section>
+{% endblock %}

@@ -4,7 +4,8 @@ import os
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from bd2watcher.config import Config, load_config
 from bd2watcher.cycle import find_watched, run_check
@@ -12,6 +13,7 @@ from bd2watcher.fetcher import HttpFetcher
 from bd2watcher.models import Alert, Listing
 from bd2watcher.notifiers import DiscordNotifier, DryRunNotifier
 from bd2watcher.store import Store
+from bd2watcher.web import create_app
 
 log = logging.getLogger("bd2watcher")
 
@@ -49,10 +51,10 @@ def send_test_alert(notifiers: list, channel: str) -> None:
     raise SystemExit(f"No notifier for channel {channel!r}")
 
 
-def run(config: Config, db_path: str, notifiers: list) -> None:
-    """Check every source now, then on its interval, until stopped."""
+def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
+    """Check every source now and then on its interval, and serve the dashboard, until stopped."""
     fetcher = HttpFetcher(config.user_agent)
-    scheduler = BlockingScheduler()
+    scheduler = BackgroundScheduler()
     minutes = config.intervals.store_minutes
     os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
 
@@ -71,6 +73,10 @@ def run(config: Config, db_path: str, notifiers: list) -> None:
             next_run_time=datetime.now(timezone.utc), id=source.name, max_instances=1,
         )
     scheduler.start()
+    try:
+        uvicorn.run(create_app(config, lambda: Store(db_path)), host="0.0.0.0", port=port, log_level="warning")
+    finally:
+        scheduler.shutdown()
 
 
 def main() -> None:
@@ -93,7 +99,8 @@ def main() -> None:
     elif args.command == "send-test-alert":
         send_test_alert(build_notifiers(config, args.dry_run), args.channel)
     else:
-        run(config, os.environ.get("BD2_DB", "data/bd2watcher.db"), build_notifiers(config, args.dry_run))
+        run(config, os.environ.get("BD2_DB", "data/bd2watcher.db"), build_notifiers(config, args.dry_run),
+            int(os.environ.get("BD2_PORT", "8080")))
 
 
 if __name__ == "__main__":

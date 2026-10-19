@@ -11,4 +11,5 @@ COPY config ./config
 RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH" BD2_CONFIG=/app/config/config.yaml BD2_DB=/app/data/bd2watcher.db
+EXPOSE 8080
 CMD ["bd2watcher", "run"]

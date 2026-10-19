@@ -34,6 +34,18 @@ def kind_of(raw: RawListing, config: Config) -> Kind | None:
     return "other"
 
 
+def product_of(raw: RawListing, series: str, kind: str, config: Config) -> str:
+    """Name the product so the same box at different stores lands in one dashboard row."""
+    if kind != "sealed":
+        return raw.title
+    title = normalise(raw.title)
+    language = "EN" if any(normalise(m) in f" {title} " for m in config.english_markers) else "JP"
+    for rule in config.products:
+        if any(normalise(k) in title for k in rule.keywords):
+            return f"{series} {rule.name} ({language})"
+    return raw.title
+
+
 def stock_state_of(raw: RawListing, config: Config) -> StockState:
     if raw.available is None:
         return "unknown"
