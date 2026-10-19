@@ -120,3 +120,63 @@ def test_a_price_line_continues_to_the_stores_latest_check(config, store, jpy_st
     data = json.loads(page.split('<script id="chart-data" type="application/json">', 1)[1].split("</script>", 1)[0])
     tcg = next(d["data"] for d in data["datasets"] if d["label"] == "TCG Corner")
     assert tcg == [{"x": now.isoformat(), "y": 54.99}, {"x": later.isoformat(), "y": 54.99}]
+
+
+def chart(config, store, **params):
+    page = TestClient(create_app(config, store)).get("/product", params=params).text
+    data = json.loads(page.split('<script id="chart-data" type="application/json">', 1)[1].split("</script>", 1)[0])
+    return {d["label"]: d["data"] for d in data["datasets"]}
+
+
+def test_a_listing_saved_before_price_history_existed_gets_a_starting_point(config, store, tcg_corner, now):
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now, [])
+    store.db.execute("DELETE FROM price_points")  # as if saved by an older version
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now + timedelta(minutes=10), [])
+
+    assert [p.price for p in store.price_history("tcg-corner", str(BOX))] == [Decimal("54.99")]
+
+
+def test_the_line_stops_at_the_last_successful_check(config, store, tcg_corner, now):
+    from conftest import FakeFetcher
+
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now, [])
+    with pytest.raises(Exception):
+        run_check(config.source("tcg-corner"), config, FakeFetcher({}), store, now + timedelta(days=2), [])
+    assert chart(config, store, name="Brown Dust 2 Booster Box (JP)")["TCG Corner"] == [{"x": now.isoformat(), "y": 54.99}]
+
+
+def test_offers_without_an_exchange_rate_sort_after_converted_ones(config, store, tcg_corner, now):
+    import copy
+    config.sources.append(Source(name="eur-shop", label="Euro Shop", adapter="shopify",
+                                 base_url="https://eur.example", currency="EUR"))
+    box = copy.deepcopy(tcg_corner.product(BOX))
+    box["variants"][0]["price"] = "1.00"
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now, [])
+    run_check(config.source("eur-shop"), config, ShopifyStoreFake("https://eur.example", [box]), store, now, [])
+
+    page = TestClient(create_app(config, store)).get("/").text
+    row = page.split('data-product="Brown Dust 2 Booster Box (JP)"', 1)[1].split("</tr>", 1)[0]
+    assert row.index("TCG Corner") < row.index("Euro Shop")
+
+
+def test_the_product_page_only_shows_its_own_series_and_kind(config, store, now):
+    from bd2watcher.models import Listing
+
+    def listing(i, series, kind):
+        return Listing("tcg-corner", str(i), f"Item {i}", f"https://x.example/{i}", series, kind,
+                       Decimal("10"), "USD", "in_stock", "Booster Box")
+    store.save_listings([listing(1, "Brown Dust 2", "sealed"), listing(2, "Other", "sealed")], now)
+    for l in store.listings():
+        store.add_price_point(l, now)
+
+    page = TestClient(create_app(config, store)).get("/").text
+    href = page.split('data-product="Booster Box"', 1)[1].split('href="', 1)[1].split('"', 1)[0].replace("&amp;", "&")
+    product = TestClient(create_app(config, store)).get(href).text
+    assert "x.example/1" in product and "x.example/2" not in product
+
+
+def test_each_price_point_converts_with_its_own_currency(config, store, tcg_corner, now):
+    refresh_rates(store, FxApi({"JPY": 0.0067}), {"JPY"}, now)
+    run_check(config.source("tcg-corner"), config, tcg_corner, store, now, [])
+    store.db.execute("UPDATE price_points SET currency = 'JPY', price = '6000'")  # recorded when the store sold in yen
+    assert chart(config, store, name="Brown Dust 2 Booster Box (JP)")["TCG Corner"][0]["y"] == 40.2

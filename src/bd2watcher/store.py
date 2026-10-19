@@ -319,6 +319,11 @@ class Store:
         ).fetchall()
         return [(_announcement(r[2:]), r[0], r[1]) for r in rows]
 
+    def last_successful_check(self, source: str) -> datetime | None:
+        row = self.db.execute("SELECT MAX(checked_at) FROM source_checks WHERE source = ? AND ok = 1",
+                              (source,)).fetchone()
+        return datetime.fromisoformat(row[0]) if row[0] else None
+
     def record_check(self, source: str, checked_at: datetime, ok: bool,
                      listing_count: int, error: str | None = None) -> None:
         with self.db:

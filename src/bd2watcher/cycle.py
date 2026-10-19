@@ -62,7 +62,8 @@ def run_check(source: Source, config: Config, fetcher, store: Store, now: dateti
     store.save_listings(listings, now)
     for l in listings:
         before = previous.get(l.external_id)
-        if l.price is not None and (before is None or before.price != l.price):
+        if l.price is not None and (before is None or before.price != l.price
+                                    or not store.price_history(l.source, l.external_id)):
             store.add_price_point(l, now)
     store.mark_sold_out(source.name, missing)
     store.record_check(source.name, now, ok=True, listing_count=len(listings))

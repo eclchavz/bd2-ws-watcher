@@ -141,7 +141,8 @@ def run(config: Config, db_path: str, notifiers: list, port: int) -> None:
         finally:
             store.close()
 
-    scheduler.add_job(rates, "interval", hours=6, next_run_time=datetime.now(timezone.utc), id="fx")  # fetches once a day
+    # Tries every 6 hours; refresh_rates only calls the API once per UTC day, so the later tries are retries.
+    scheduler.add_job(rates, "interval", hours=6, next_run_time=datetime.now(timezone.utc), id="fx")
 
     if not any(n.channel == "email" for n in notifiers):
         log.warning("GMAIL_ADDRESS / GMAIL_APP_PASSWORD not set: no email alerts and no daily digest")

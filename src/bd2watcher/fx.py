@@ -1,14 +1,13 @@
 import logging
 from datetime import datetime
 
+from bd2watcher.config import Config
 from bd2watcher.store import Store
 
 log = logging.getLogger(__name__)
 
-DEFAULT_URL = "https://api.frankfurter.dev/v1/latest?base={currency}&symbols=USD"
-
-
-def refresh_rates(store: Store, fetcher, currencies: set[str], now: datetime, url: str = DEFAULT_URL) -> None:
+def refresh_rates(store: Store, fetcher, currencies: set[str], now: datetime,
+                  url: str = Config.model_fields["fx_url"].default) -> None:
     """Fetch each currency's USD rate at most once a (UTC) day. If the API is down, the last stored rate stays."""
     for currency in sorted(c for c in currencies if c and c != "USD"):
         fetched = store.rate_fetched_at(currency)

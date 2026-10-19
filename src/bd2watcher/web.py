@@ -7,10 +7,9 @@ from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi import HTTPException
 from fastapi.templating import Jinja2Templates
 
 from bd2watcher.config import Config
@@ -55,12 +54,13 @@ def create_app(config: Config, store: Store) -> FastAPI:
         rows = [
             {
                 "series": series, "kind": kind, "product": product,
-                "href": "/product?" + urlencode({"name": product}),
+                "href": "/product?" + urlencode({"name": product, "series": series, "kind": kind}),
                 "offers": [
                     {"listing": o, "price": price_text(o.price, o.currency, rates.get(o.currency))}
+                    # In stock first; within that, cheapest in USD; prices we can't convert yet come last.
                     for o in sorted(offers, key=lambda o: (
-                        STOCK_ORDER[o.stock_state], o.price is None,
-                        usd(o.price, rates[o.currency]) if o.price is not None and rates.get(o.currency) else o.price or 0,
+                        STOCK_ORDER[o.stock_state], o.price is None or rates.get(o.currency) is None,
+                        usd(o.price, rates[o.currency]) if o.price is not None and rates.get(o.currency) else 0,
                     ))
                 ],
             }
@@ -76,31 +76,35 @@ def create_app(config: Config, store: Store) -> FastAPI:
         })
 
     @app.get("/product", response_class=HTMLResponse)
-    def product(request: Request, name: str):
+    def product(request: Request, name: str, series: str | None = None, kind: str | None = None):
         with lock:
             enabled = {s.name for s in config.enabled_sources}
-            listings = [l for l in store.listings() if l.source in enabled and (l.product or l.title) == name]
+            listings = [l for l in store.listings() if l.source in enabled and (l.product or l.title) == name
+                        and series in (None, l.series) and kind in (None, l.kind)]
             if not listings:
                 raise HTTPException(404, "No such product")
             histories = {(l.source, l.external_id): store.price_history(l.source, l.external_id) for l in listings}
-            last_checks = {l.source: store.last_check(l.source) for l in listings}
-            rates = {c: store.usd_rate(c) for c in {l.currency for l in listings}}
+            last_ok = {l.source: store.last_successful_check(l.source) for l in listings}
+            currencies = {p.currency for h in histories.values() for p in h} | {l.currency for l in listings}
+            rates = {c: store.usd_rate(c) for c in currencies}
 
+        several_per_store = len({l.source for l in listings}) < len(listings)
         datasets, missing_rates = [], set()
         for l in listings:
-            rate = rates.get(l.currency)
-            if rate is None:
-                missing_rates.add(l.currency)
+            history = histories[(l.source, l.external_id)]
+            points = []
+            for p in history:
+                if rates.get(p.currency) is None:
+                    missing_rates.add(p.currency)
+                else:
+                    points.append({"x": p.at.isoformat(), "y": float(usd(p.price, rates[p.currency]))})
+            if not points:
                 continue
-            datasets.append({
-                "label": labels.get(l.source, l.source) + ("" if len({x.source for x in listings}) == len(listings)
-                                                           else f" ({l.title})"),
-                "data": [{"x": p.at.isoformat(), "y": float(usd(p.price, rate))} for p in histories[(l.source, l.external_id)]],
-            })
-            # The latest price still holds, so carry the line on to the store's last check.
-            history, check = histories[(l.source, l.external_id)], last_checks[l.source]
-            if history and check and check.checked_at > history[-1].at:
-                datasets[-1]["data"].append({"x": check.checked_at.isoformat(), "y": float(usd(history[-1].price, rate))})
+            # The latest price still holds, so carry the line on to the store's last successful check.
+            if last_ok[l.source] and last_ok[l.source] > history[-1].at:
+                points.append({"x": last_ok[l.source].isoformat(), "y": points[-1]["y"]})
+            label = labels.get(l.source, l.source)
+            datasets.append({"label": f"{label} ({l.title})" if several_per_store else label, "data": points})
         return templates.TemplateResponse(request, "product.html", {
             "name": name, "chart_js": CHART_JS, "missing_rates": sorted(missing_rates),
             "chart_data": json.dumps({"datasets": datasets}).replace("</", "<\\/"),

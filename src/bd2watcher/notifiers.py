@@ -16,6 +16,7 @@ HEADLINES = {
     "preorder_opened": "📦 PREORDER OPEN",
     "new_set": "📣 ANNOUNCED",
     "english_release": "🇺🇸 ENGLISH RELEASE ANNOUNCED",
+    "price_changed": "💲 PRICE CHANGED",  # never routed to a channel, but formattable
 }
 STOCK_WORDS = {"in_stock": "in stock", "preorder": "preorder", "sold_out": "sold out", "unknown": "stock unknown"}
 
