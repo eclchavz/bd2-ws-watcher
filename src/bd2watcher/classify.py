@@ -23,7 +23,11 @@ def normalise(text: str) -> str:
 
 
 def series_of(raw: RawListing, config: Config) -> str | None:
-    title = normalise(raw.title)
+    return series_of_title(raw.title, config)
+
+
+def series_of_title(title: str, config: Config) -> str | None:
+    title = normalise(title)
     for watchlist in config.watchlists:
         if any(normalise(k) in title for k in watchlist.keywords):
             return watchlist.series

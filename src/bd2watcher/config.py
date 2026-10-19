@@ -13,6 +13,7 @@ class Intervals(BaseModel):
 class Watchlist(BaseModel):
     series: str
     keywords: list[str]
+    set_codes: list[str] = []  # official product URL codes, e.g. "brd" for /products/brd_bp/
 
 
 class SingleRules(BaseModel):
@@ -53,21 +54,38 @@ class HtmlSelectors(BaseModel):
     in_stock: list[str] = ["in stock", "add to cart", "available", "在庫あり", "カートに入れる"]
 
 
+class OfficialSite(BaseModel):
+    """How to read an official Weiss Schwarz site's product list."""
+
+    language: Literal["JP", "EN"]
+    list_path: str = "/products/"
+    link_pattern: str = r"/products/[\w-]+/?$"  # one product page per set
+
+
 class Source(BaseModel):
     name: str
     label: str | None = None
-    adapter: Literal["shopify", "html"]
+    adapter: Literal["shopify", "html", "official"]
     base_url: str
     products_path: str = "/products.json"
-    currency: str
     enabled: bool = True
     html: HtmlSelectors | None = None
+    official: OfficialSite | None = None
+    currency: str = ""
 
     @model_validator(mode="after")
-    def _html_needs_selectors(self):
+    def _check_adapter_settings(self):
         if self.adapter == "html" and self.html is None:
             raise ValueError(f"source {self.name!r} uses the html adapter but has no html: selectors")
+        if self.adapter != "official" and not self.currency:
+            raise ValueError(f"store {self.name!r} needs a currency")
+        if self.adapter == "official" and self.official is None:
+            raise ValueError(f"source {self.name!r} uses the official adapter but has no official: settings")
         return self
+
+    @property
+    def is_official(self) -> bool:
+        return self.adapter == "official"
 
     @property
     def display_name(self) -> str:

@@ -13,6 +13,8 @@ user_agent: "bd2-ws-watcher/0.1 (personal stock checker; +https://github.com/ecl
 watchlists:
   - series: Brown Dust 2
     keywords: ["Brown Dust 2", "BrownDust2", "ブラウンダスト2"]
+    # From the official product URLs ws-tcg.com/products/brd_bp/ and brd_td/ (press coverage).
+    set_codes: ["brd"]
 
 # Checked in order: a title matching `single` is dropped first, then supply, then sealed.
 # Anything matching none of them is kind `other` and is dropped.
@@ -43,6 +45,22 @@ preorder_markers: ["pre-order", "preorder", "予約"]
 # `bd2watcher discover` confirms its platform, currency and best products_path.
 # Prefer a Weiss Schwarz collection path over /products.json: it's far fewer requests.
 sources:
+  # Official sites are checked every intervals.official_minutes. Their page layout couldn't be
+  # confirmed from the build environment: run `bd2watcher check-now official-jp` to verify.
+  - name: official-jp
+    label: Weiss Schwarz (JP)
+    adapter: official
+    base_url: https://ws-tcg.com
+    official:
+      language: JP
+
+  - name: official-en
+    label: Weiss Schwarz (EN)
+    adapter: official
+    base_url: https://en.ws-tcg.com
+    official:
+      language: EN
+
   - name: tcg-corner
     label: TCG Corner
     adapter: shopify
