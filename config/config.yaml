@@ -87,3 +87,18 @@ sources:
     base_url: https://www.hammergirlanime.com
     currency: USD          # unconfirmed: run discover
     enabled: false
+
+  # A non-Shopify store uses the html adapter with CSS selectors. Example (WooCommerce):
+  # - name: example-store
+  #   label: Example Store
+  #   adapter: html
+  #   base_url: https://example-store.com
+  #   currency: USD
+  #   html:
+  #     list_path: /product-category/weiss-schwarz/
+  #     product: li.product
+  #     title: .woocommerce-loop-product__title
+  #     link: a
+  #     price: ".price ins .amount, .price > .amount"   # sale price, not the struck-through one
+  #     stock: .stock
+  #     next_page: a.next

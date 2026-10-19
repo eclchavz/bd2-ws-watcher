@@ -96,7 +96,7 @@ def main() -> None:
     commands.add_parser("run", parents=[dry_run], help="check on a schedule until stopped")
     discover_parser = commands.add_parser("discover", help="report each store's platform, currency and collections")
     discover_parser.add_argument("sources", nargs="*", help="source names (default: all, including disabled)")
-    capture_parser = commands.add_parser("capture-fixture", help="save a store's products.json pages for tests")
+    capture_parser = commands.add_parser("capture-fixture", help="save a store's current pages for tests")
     capture_parser.add_argument("source")
     capture_parser.add_argument("--out", default="tests/fixtures")
     test_parser = commands.add_parser("send-test-alert", parents=[dry_run], help="send a sample alert to one channel")

@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class Intervals(BaseModel):
@@ -36,14 +36,38 @@ class ProductRule(BaseModel):
     keywords: list[str]
 
 
+class HtmlSelectors(BaseModel):
+    """How to read a non-Shopify store's listing pages. Selectors are CSS, relative to each product."""
+
+    list_path: str
+    product: str
+    title: str
+    link: str
+    price: str | None = None
+    stock: str | None = None
+    next_page: str | None = None
+    max_pages: int = 10
+    # Stock text patterns, checked in this order: sold out, then preorder, then in stock.
+    sold_out: list[str] = ["out of stock", "not in stock", "sold out", "unavailable", "not available", "品切れ", "在庫切れ", "売り切れ", "完売"]
+    preorder: list[str] = ["pre-order", "preorder", "backorder", "予約"]
+    in_stock: list[str] = ["in stock", "add to cart", "available", "在庫あり", "カートに入れる"]
+
+
 class Source(BaseModel):
     name: str
     label: str | None = None
-    adapter: Literal["shopify"]
+    adapter: Literal["shopify", "html"]
     base_url: str
     products_path: str = "/products.json"
     currency: str
     enabled: bool = True
+    html: HtmlSelectors | None = None
+
+    @model_validator(mode="after")
+    def _html_needs_selectors(self):
+        if self.adapter == "html" and self.html is None:
+            raise ValueError(f"source {self.name!r} uses the html adapter but has no html: selectors")
+        return self
 
     @property
     def display_name(self) -> str:

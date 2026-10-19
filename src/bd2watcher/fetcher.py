@@ -1,3 +1,4 @@
+import re
 import time
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
@@ -7,6 +8,21 @@ import httpx
 TIMEOUT_SECONDS = 20
 ROBOTS_MAX_AGE_SECONDS = 24 * 3600
 MAX_REDIRECTS = 5
+
+
+META_CHARSET = re.compile(rb"<meta[^>]+charset=[\"']?([\w-]+)", re.IGNORECASE)
+
+
+def decode_html(content: bytes, header_charset: str | None) -> str:
+    """Decode a page using the HTTP charset, else a <meta charset> in its first 4 KB, else UTF-8."""
+    charset = header_charset
+    if not charset:
+        match = META_CHARSET.search(content[:4096])
+        charset = match.group(1).decode("ascii") if match else "utf-8"
+    try:
+        return content.decode(charset, errors="replace")
+    except LookupError:
+        return content.decode("utf-8", errors="replace")
 
 
 class RobotsDisallowed(Exception):
@@ -32,12 +48,19 @@ class HttpFetcher:
         self.robots: dict[str, tuple[float, RobotFileParser]] = {}
 
     def get_json(self, url: str):
+        return self._get(url).json()
+
+    def get_text(self, url: str) -> str:
+        response = self._get(url)
+        return decode_html(response.content, response.charset_encoding)
+
+    def _get(self, url: str) -> httpx.Response:
         for _ in range(MAX_REDIRECTS + 1):
             self._check_robots(url)
             response = self.client.get(url)
             if not response.is_redirect:
                 response.raise_for_status()
-                return response.json()
+                return response
             url = urljoin(url, response.headers["location"])
         raise httpx.TooManyRedirects(f"More than {MAX_REDIRECTS} redirects", request=response.request)
 

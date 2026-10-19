@@ -59,6 +59,8 @@ def product_of(raw: RawListing, series: str, kind: str, config: Config) -> str:
 
 
 def stock_state_of(raw: RawListing, config: Config) -> StockState:
+    if raw.stock_state is not None:
+        return raw.stock_state
     if raw.available is None:
         return "unknown"
     if not raw.available:
